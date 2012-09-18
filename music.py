@@ -30,8 +30,16 @@ max(audio) == 2**31
 # normalize audio -> F(440) ~= 1
 # doesnt quite work. adds const (0Hz) signal (= flat line)
 samples = len(audio)
-cycles  = 3 # 3 sec
 
-freqs, spectrum = fft_(audio, samples, cycles)
-print filter(lambda x: smooth(x[1], eps=0.5) > 0, zip(half(freqs), half(spectrum)) )
-plot_fft(audio, samples, cycles)
+
+#audio = audio*(audio>0) / max(audio) + audio*(audio<0) / abs(min(audio))
+# normalize audio -> F(440) ~= 1
+# doesnt quite work. adds const (0Hz) signal (= flat line)
+
+# half(fftfreq(n,d)) => [0/n 1/n 2/n ... 1/2) / d
+# half(fftfreq(8,1)) => [0/8 1/8 2/8 3/8]
+
+freqs, spectrum = fft_(audio, samples, sample_rate)
+#print filter(lambda x: smooth(x[1], eps=0.5) > 0, zip(half(freqs), half(spectrum)) )
+print sorted( zip(half(freqs), half(spectrum)), key=lambda ue: ue[0] )
+plot_fft(audio, samples, sample_rate)

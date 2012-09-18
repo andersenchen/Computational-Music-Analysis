@@ -31,19 +31,19 @@ f4 = cos( 4 * times ) #a([1,-1, 1,-1, 1,-1, 1,-1])
 #signal = f1 + f2 + f3 + f4
 signal = f1 + f2 + f3 + f4
 
-def fft_(signal, samples, cycles):
-    spectrum = abs(fft(signal)) * cycles/samples
-    freqs    = fftfreq(samples, d=cycles/samples)
-     # normalize signal to |cycles| seconds
+def fft_(signal, samples, sample_rate):
+    spectrum = abs(fft(signal)) * sample_rate
+    freqs    = fftfreq(samples, d=1/sample_rate)
+     # normalize signal to |sample_rate| seconds
     return freqs, spectrum
 
-def print_fft(signal, samples, cycles):
-    freqs, spectrum = fft_(signal, samples, cycles)
+def print_fft(signal, samples, sample_rate):
+    freqs, spectrum = fft_(signal, samples, sample_rate)
     pfft(freqs, spectrum)
 
 from matplotlib.pyplot import *
-def plot_fft(signal, samples, cycles):
-    freqs, spectrum = fft_(signal, samples, cycles)
+def plot_fft(signal, samples, sample_rate):
+    freqs, spectrum = fft_(signal, samples, sample_rate)
     semilogx( half(freqs), half(spectrum) )
     show()
 
