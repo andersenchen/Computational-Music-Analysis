@@ -1,12 +1,12 @@
 #!/usr/bin/python
 from __future__ import division
+from sam import *
 
 from numpy import *
 from numpy.fft import *
 
 def half(x): return x[:len(x)//2]
-a=array
-def smooth(x, eps=1e-9): return x if abs(x) > eps else 0
+
 def pfft(frequencies, spectrum):
     print
     print 'u\tF(u)'
