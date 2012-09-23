@@ -13,8 +13,7 @@ end
 
 %% Initialize
 
-% parameters
-lambda = 1;
+% parameters (todo: learn these a la Gibbs)
 q = 100;    % start with a big q, lock it down after burn-in period   
 Rk = std;   % cheat and copy actual
 
@@ -37,9 +36,8 @@ oldxk = [processed(1) 35000]';
 
 %% Kalman filter
 
-results = zeros(5,0);
+results = zeros(numel(processed)-1,5);
 for k = 2:numel(processed)
-    k;
     yk = processed(k); %onset position
 
     % This is how you solve burn-in (start with big q and make it small later)
@@ -60,25 +58,33 @@ for k = 2:numel(processed)
     pyk = normpdf(yk, H*xk, Wk)+eps;
 
     % [onset #, position, position guess, tempo guess, (un-)certainty]
-    [results ; k yk/44100 xk(1)/44100 xk(2)/44100 pyk*100000]
-    results = [results ; k yk/44100 xk(1)/44100 xk(2)/44100 pyk*100000];
+    results(k-1,1:end) = [k yk/44100 xk(1)/44100 xk(2)/44100 pyk*100000];
 
     % Kalman Update
     residualError = yk - H*xk(1:end, 1:end);
     Kk = Pk(1:end, 1:end)*H'*(Wk)^(-1); % optimal Kalman gain
     xk(1:end, 1:end) = xk(1:end, 1:end) + Kk*residualError;
     Pk(1:end, 1:end) = (I-Kk*H)*Pk(1:end, 1:end);
-
+    
+    % todo: sample instead of maximize? theoretically better?
     oldPk = Pk;
     oldxk = xk;
 end
 
 %% Graphs and stuff
-%plot(results(1,1:end),results(5,1:end));
-%plot(results(1:end,2) - results(1:end,3));
-subplot(3,1,1)
+
+% deviation from (known) hidden beat state
+subplot(4,1,1)
 plot(results(1:end,1) - results(1:end,2));
-subplot(3,1,2)
+
+% deviation of predicted beat from actual beat
+subplot(4,1,2)
 plot(results(1:end,2) - results(1:end,3));
-subplot(3,1,3)
+
+% deviation of predicted beat from actual beat
+subplot(4,1,3)
+plot(results(1:end,2) - results(1:end,3));
+
+% deviation of predicted tempo from actual tempo
+subplot(4,1,4)
 plot(results(1:end,4));
