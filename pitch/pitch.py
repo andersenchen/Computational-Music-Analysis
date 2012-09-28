@@ -16,6 +16,8 @@ window_size = 2**12
 hanning_window = hanning(window_size)
 
 
+# spectrum :: |windows| by |frequencies|
+#  |windows| / 2 * |frequencies| ~ |seconds| * |sample_rate|
 def process_wav(file):
     print 'processing %s...', file
 
@@ -29,7 +31,6 @@ def process_wav(file):
 
     spectrum = zeros((n_windows,window_size))
     true_spectrum = spectrum.copy()
-    #  spectrum :: |time bins| by |frequency bins|
 
     for i in xrange(0,n_windows-1):
         t = int32(i* window_size/2)
@@ -37,7 +38,7 @@ def process_wav(file):
         true_spectrum[i,:] = fft(window)
         spectrum[i,:] = abs(true_spectrum[i,:])
 
-    return spectrum, true_spectrum, n_windows
+    return spectrum, true_spectrum
 
 
 def to_freq(file): return int(basename(file)[1:])
@@ -54,7 +55,7 @@ def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
     freqs = nones(n)
 
     for i,file in enumerate(flatten(data)):
-        spec, tspec, _ = process_wav(file)
+        spec, tspec = process_wav(file)
         
         # normalize to unit vector
         classifier[i,:] = sum(spec)  /     sum(sum(spec))

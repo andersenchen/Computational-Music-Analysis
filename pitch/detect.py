@@ -23,7 +23,8 @@ classifier, tclass, freqs = train_joint()
 #  classifier :: window_size by bit_precision
 
 file = 'chord.wav'
-spectrum, _, nWindows = process_wav(file)
+spectrum, _ = process_wav(file)
+n_windows = spectrum.shape[0]
 
 # pseudoinverse solution
 # solve Ax=b for x given A,b
@@ -33,14 +34,14 @@ spectrum, _, nWindows = process_wav(file)
 def pitch_pinv():
     Ai = pinv(classifier)
 
-    x = zeros((nWindows, classifier.shape[1]))
+    x = zeros((n_windows, classifier.shape[1]))
 
-    for i in xrange(nWindows):
+    for i in xrange(n_windows):
         # normalize frequency to unit vector
         b = spectrum[i,:] / sum(spectrum[i,:])
         # x=A\b
         print 'us', spectrum.shape
-        print 'nW', nWindows
+        print 'nW', n_windows
         print 'A', Ai.shape
         print 'b', b.shape
         print 'x', x.shape
