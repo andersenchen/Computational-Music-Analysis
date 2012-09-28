@@ -1,5 +1,7 @@
 from __future__ import division
+
 from sam import *
+from compmusic.sambo.music import *
 
 from numpy import *
 from numpy.fft import *
@@ -8,6 +10,7 @@ from matplotlib.pyplot import *
 import argparse
 from scipy.io import wavfile
 from glob import *
+
 
 
 def process_wav(file):
@@ -46,8 +49,8 @@ def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
     tclass     = classifier.copy()
     
     data = [sorted(files, key=to_freq) for files in data]
-    #  sort filenames by frequency ascending
-    freqs = zeros(n)
+     #  sort filenames by frequency ascending
+    freqs = nones(n)
 
     for i,file in enumerate(flatten(data)):
         spec, tspec = process_wav(file)
@@ -58,9 +61,9 @@ def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
         
         # keep track of file's pitch
         #eg 'A440.wav' => 440
-        freqs[i] = to_freq(file)
+        freqs[i] = note(to_freq(file))
         
-    freqs = sorted(set(freqs))
+    freqs = sorted(set(freqs),key=snd)
     print
     print 'freqs...'
     for freq in freqs: print freq

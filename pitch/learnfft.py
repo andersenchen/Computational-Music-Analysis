@@ -14,5 +14,5 @@ from numpy.fft import *
 from matplotlib.pyplot import *
 
 # Train the classifier
-classifier, tclass = train_joint()
+classifier, tclass, freqs = train_joint()
 

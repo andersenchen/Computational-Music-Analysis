@@ -7,12 +7,14 @@ from fft import *
 K = 0
 F = 1
 
-keys = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b']
+keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 def piano():
-    notes = [('g#0', 25.9565)]
-    notes = notes + zip(['a0', 'a#0', 'b0'], [27.5000, 29.1352, 30.8677])
+    notes = [('G#0', 25.9565)]
+    notes = notes + zip(['A0', 'A#0', 'B0'], [27.5000, 29.1352, 30.8677])
     notes = notes + [ (keys[key] + str(octave), 16.3516 * 2**(octave + key/12))  for octave in xrange(1,7+1)  for key in xrange(0,11+1) ]
-    notes = notes + [('c8', 4186.01)]
+    notes = notes + [('C8', 4186.01)]
+    
+    notes = [(k,round(f)) for k,f in notes]
     return notes
 
 #:: [(key, freq)]
@@ -20,7 +22,7 @@ notes = piano()
 freqs = dict(notes)
 
 key, frequency = notes[49] 
-assert 'a4' == key
+assert 'A4' == key
 assert about( 440, frequency )
 
 
@@ -33,10 +35,11 @@ def note(freq):
     return reduce((lambda x,y: x if nearer(freq, x[F],y[F]) else y), notes)
 
 key, frequency = note(440)
-assert 'a4' == key
+assert 'A4' == key
 
 
-def freq(note): return freqs[note] if note in freqs else None
+def freq(note):
+    return freqs[note.upper()] if note.upper() in freqs else None
 
 assert about( freq('a4'), 440 )
 
