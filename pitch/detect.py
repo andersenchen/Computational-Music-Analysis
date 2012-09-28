@@ -28,25 +28,30 @@ n_windows = spectrum.shape[0]
 
 # pseudoinverse solution
 # solve Ax=b for x given A,b
-# x = notes
-# b = audio (known from input)
-# A = instrument/note overtone/undertone profile (known from training)
+# x : (d,1) = notes
+# b : (d',1) = audio (known from input)
+# A : (d',d) = instrument/note overtone/undertone profile (known from training)
+# d = dimensionality of hidden var
+# d' = dimensionality of observed var
+# eg d = 8 = |keys in 1 piano 8ve| . d' = 4096 = |linear bins of audible pitches|
 def pitch_pinv():
     Ai = pinv(classifier)
 
-    x = zeros((n_windows, classifier.shape[1]))
+    x = zeros((n_windows, classifier.shape[0]))
 
-    for i in xrange(n_windows):
+    print 'd', classifier.shape[0]
+    print 'sr', classifier.shape[1]
+    print 'nW', n_windows
+    print 'us', spectrum.shape
+    print 'A', Ai.shape
+    print 'b', spectrum[0,:].shape
+    print 'x', x.shape
+    
+    for i in xrange(n_windows-1):
         # normalize frequency to unit vector
         b = spectrum[i,:] / sum(spectrum[i,:])
         # x=A\b
-        print 'us', spectrum.shape
-        print 'nW', n_windows
-        print 'A', Ai.shape
-        print 'b', b.shape
-        print 'x', x.shape
-        exit()
-        x[i,:] = dot( Ai, b )
+        x[i,:] = dot( Ai.transpose(), b )
 
     return x
 
@@ -67,4 +72,25 @@ def pitch(how='nmf'):
     except KeyError:
         raise ValueError('\n'.join(["pitch()...", " wants how={'nmf'|'pinv'|'gd'}", " got how=%s" % how]))
 
-pitch('pinv')
+# main
+x = pitch('pinv')
+imshow(x.transpose(), origin='lower', aspect=344/16)
+show()
+
+# plot
+"""
+from mpl_toolkits.mplot3d import Axes3D
+fig = figure()
+ax = fig.gca(projection='3d')
+times, freqs = x.shape
+X = a(r(1,times))
+Y = a(r(1,freqs))
+X, Y = meshgrid(X, Y)
+Z = x
+print X.shape
+print Y.shape
+print Z.shape
+surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.jet,
+        linewidth=0, antialiased=False)
+show()
+"""

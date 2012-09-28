@@ -19,7 +19,7 @@ hanning_window = hanning(window_size)
 # spectrum :: |windows| by |frequencies|
 #  |windows| / 2 * |frequencies| ~ |seconds| * |sample_rate|
 def process_wav(file):
-    print 'processing %s...', file
+    print 'processing %s' % file
 
     sample_rate, audio = wavfile.read(file)
     #  audio :: |samples| by |channels|
@@ -43,7 +43,10 @@ def process_wav(file):
 
 def to_freq(file): return int(basename(file)[1:])
 
-def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
+def train_joint(data = [glob('train/piano/*.wav')]):#, glob('train/cello/*.wav')]):
+    print
+    print 'TRAINING...'
+
     n  = len(flatten(data))
     print 'n =', n
 
@@ -71,5 +74,7 @@ def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
 #    for freq in freqs: print freq
 #    print
     
+    print 'DONE TRAINING.'
+    print
     return classifier, tclass, freqs
 
