@@ -31,7 +31,7 @@ def process_wav(file):
     true_spectrum = spectrum.copy()
     #  spectrum :: |time bins| by |frequency bins|
 
-    for i in r(0,n_windows-3): #n_windows-3?
+    for i in xrange(0,n_windows-1):
         t = int32(i* window_size/2)
         window = audio[t : t+window_size] * hanning_window # elemwise mult
         true_spectrum[i,:] = fft(window)
