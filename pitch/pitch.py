@@ -12,6 +12,9 @@ from scipy.io import wavfile
 from glob import *
 
 
+window_size = 2**12
+hanning_window = hanning(window_size)
+
 
 def process_wav(file):
     print 'processing %s...', file
@@ -22,21 +25,19 @@ def process_wav(file):
     audio = audio[:int32(audio.shape)[0], 0]
     #  keep first channel
     #  keep first 2^31 samples
+    n_windows = int32(audio.size/window_size *2) # double <- overlap windows
 
-    windowSize = 2**12
-    nWindows = int32(audio.size/windowSize *2) # double <- overlap windows
-    hanningWindow = hanning(windowSize)
-    spectrum = zeros((nWindows,windowSize))
+    spectrum = zeros((n_windows,window_size))
     true_spectrum = spectrum.copy()
     #  spectrum :: |time bins| by |frequency bins|
 
-    for i in r(0,nWindows-3): #nWindows-3?
-        t = int32(i* windowSize/2)
-        window = audio[t : t+windowSize] * hanningWindow # elemwise mult
+    for i in r(0,n_windows-3): #n_windows-3?
+        t = int32(i* window_size/2)
+        window = audio[t : t+window_size] * hanning_window # elemwise mult
         true_spectrum[i,:] = fft(window)
         spectrum[i,:] = abs(true_spectrum[i,:])
 
-    return spectrum, true_spectrum
+    return spectrum, true_spectrum, n_windows
 
 
 def to_freq(file): return int(basename(file)[1:])
@@ -53,7 +54,7 @@ def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
     freqs = nones(n)
 
     for i,file in enumerate(flatten(data)):
-        spec, tspec = process_wav(file)
+        spec, tspec, _ = process_wav(file)
         
         # normalize to unit vector
         classifier[i,:] = sum(spec)  /     sum(sum(spec))
@@ -64,9 +65,10 @@ def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
         freqs[i] = note(to_freq(file))
         
     freqs = sorted(set(freqs),key=snd)
-    print
-    print 'freqs...'
-    for freq in freqs: print freq
+#    print
+#    print 'freqs...'
+#    for freq in freqs: print freq
+#    print
     
     return classifier, tclass, freqs
 
