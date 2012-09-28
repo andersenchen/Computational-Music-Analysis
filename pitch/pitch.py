@@ -36,30 +36,34 @@ def process_wav(file):
     return spectrum, true_spectrum
 
 
-def train_join(files = glob('train/piano/*.wav') + glob('train/cello/*.wav')):
-    classifier = zeros(2* length(index), 4096)
+def to_freq(file): return int(basename(file)[1:])
+
+def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
+    n  = len(flatten(data))
+    print 'n =', n
+
+    classifier = zeros((n, 4096))
     tclass     = classifier.copy()
-
-    n = len(files)
-    IDX = zeros((n,1))
-    IDXwork = zeros((n,1))
     
-    for i,file in enumerate(files):
-        spec, tspec = processWav(file)
+    data = [sorted(files, key=to_freq) for files in data]
+    #  sort filenames by frequency ascending
+    freqs = zeros(n)
 
+    for i,file in enumerate(flatten(data)):
+        spec, tspec = process_wav(file)
+        
         # normalize to unit vector
         classifier[i,:] = sum(spec)  /     sum(sum(spec))
-        tclass[i,:]     = sum(tspec) / abs(sum(sum(tspec)))
-
+        tclass    [i,:] = sum(tspec) / abs(sum(sum(tspec)))
+        
         # keep track of file's pitch
         #eg 'A440.wav' => 440
-        IDXwork[i] = int(basename(file)[1:])
-
-    permutation = argsort(IDXwork)
-    IDXwork = IDXwork[permutation]
-    classifier[1:n, :] = classifier[permutation, :]
-    tclass    [1:n, :] = tclass    [permutation, :]
-    IDX       [1:n]    = IDXwork
+        freqs[i] = to_freq(file)
+        
+    freqs = sorted(set(freqs))
+    print
+    print 'freqs...'
+    for freq in freqs: print freq
     
-    return classifier, tclass
+    return classifier, tclass, freqs
 

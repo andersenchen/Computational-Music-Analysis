@@ -6,6 +6,7 @@
 #  numpy 'A*B'  is  matlab 'A.*B'
 
 from sam import *
+from pitch import *
 #from train_joint import train_joint
 
 from numpy import *
