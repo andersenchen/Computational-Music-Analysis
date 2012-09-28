@@ -4,6 +4,7 @@ from sam import *
 
 from numpy import *
 from numpy.fft import *
+from matplotlib.pyplot import *
 
 def half(x): return x[:len(x)//2]
 
@@ -41,10 +42,26 @@ def print_fft(signal, samples, sample_rate):
     freqs, spectrum = fft_(signal, samples, sample_rate)
     pfft(freqs, spectrum)
 
-from matplotlib.pyplot import *
+def normalize(arr):
+    arr = array(arr)
+    low = min(arr)
+    high = max(arr)
+    return (arr-low)/(high-low)
+
+def get_axes(xs, ys, pad=0.1):
+    ax = min(xs)
+    bx = max(xs)
+    ay = min(ys)
+    by = max(ys)
+    return [ax*(1-pad), bx*(1+pad)] + [ay*(1-pad), by*(1+pad)]
+
 def plot_fft(signal, samples, sample_rate):
     freqs, spectrum = fft_(signal, samples, sample_rate)
-    semilogx( half(freqs), half(spectrum) )
+    xs = half(freqs)
+    ys = normalize(half(spectrum))
+    scatter(xs, ys)
+    xscale('log')
+#    axis(get_axes(xs,ys))
     show()
 
 #plot_fft(signal, samples, cycles)

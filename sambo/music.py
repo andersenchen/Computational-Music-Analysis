@@ -76,10 +76,12 @@ def main(filename, gui):
     from scipy.io import wavfile
     sample_rate, audio = wavfile.read(filename)
     #audio = audio - mean(audio) #normalize
-
+    
     #eg 44100 // 1024 * 1024 == 4032 (ignore last few samples for consistent signal size)
-    for t in arange(0, (sample_rate // window_size) * window_size, window_size):
-        t = t + 48000
+    start = sample_rate # start at 1 second
+    for t in arange(start, 
+                    start + (sample_rate // window_size) * window_size,
+                    window_size):
         signal = audio[t : t+window_size]
         freqs, spectrum = fft_(signal, window_size, sample_rate)
         #print filter(lambda x: smooth(x[1], eps=1), zip(half(freqs), half(spectrum)) )
