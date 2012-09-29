@@ -1,6 +1,6 @@
 from __future__ import division
 
-from sam import *
+from compmusic.sambo.sam import *
 from compmusic.sambo.music import *
 
 from numpy import *
@@ -43,30 +43,29 @@ def process_wav(file):
 
 def to_freq(file): return int(basename(file)[1:])
 
-def train_joint(data = [glob('train/piano/*.wav')]):#, glob('train/cello/*.wav')]):
+def train_joint(data = [glob('train/piano/*.wav')]):
+#def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
     print
     print 'TRAINING...'
-
+    
     n  = len(flatten(data))
     print 'n =', n
 
-    classifier = zeros((n, 4096))
-    tclass     = classifier.copy()
+    classifier = zeros((n, window_size))
     
     data = [sorted(files, key=to_freq) for files in data]
-     #  sort filenames by frequency ascending
-    freqs = nones(n)
+    #  sort filenames by frequency ascending
 
+    freqs = [note(to_freq(file)) for file in flatten(data)]
+    #  keep track of file's pitch
+    #  eg 'A440.wav' => 440
+    
     for i,file in enumerate(flatten(data)):
-        spec, tspec = process_wav(file)
+        spec, _ = process_wav(file)
         
         # normalize to unit vector
-        classifier[i,:] = sum(spec)  /     sum(sum(spec))
-        tclass    [i,:] = sum(tspec) / abs(sum(sum(tspec)))
-        
-        # keep track of file's pitch
-        #eg 'A440.wav' => 440
-        freqs[i] = note(to_freq(file))
+        classifier[i,:] = sum(spec,0) / sum(spec)
+        #note  sum by default reduces along all dims to scalar
         
     freqs = sorted(set(freqs),key=snd)
 #    print
@@ -76,5 +75,5 @@ def train_joint(data = [glob('train/piano/*.wav')]):#, glob('train/cello/*.wav')
     
     print 'DONE TRAINING.'
     print
-    return classifier, tclass, freqs
+    return classifier, freqs
 
