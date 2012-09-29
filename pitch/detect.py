@@ -39,11 +39,10 @@ classifier, freqs = train_joint()
 
 # read file
 file = 'chord.wav'
-spectrum, _ = process_wav(file)
+spectrum, sample_rate = process_wav(file)
 
-# config
+# consts
 n_windows = spectrum.shape[0]
-
 
 # pseudoinverse solution
 # solve Ax=b for x given A,b
@@ -125,13 +124,16 @@ def pitch(how='nmf'):
 # main
 x = pitch(how)
 #x = (x-x.min())/(x.max()-x.min())
-top_percent = 100 # threshold at brightest top_percentage%
-top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1]
-dullest = x < top_percentile
-x[dullest] = 0
+#x=log(x)
+#top_percent = 100 # threshold at brightest top_percentage%
+#top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1]
+#dullest = x < top_percentile
+#x[dullest] = 0
 print x.min()
 print x.max()
 print x.shape
+n_windows = x.shape[0]
+d = x.shape[1]
 
 # plot
 # x-axis = time in seconds
@@ -139,8 +141,24 @@ print x.shape
 #  j => j / window_rate
 # y-axis = pitch as note (frequency in Hz)
 #  i => freqs[i]
+
 if __name__=='__main__':
-    imshow(t(x), origin='lower', aspect=344/16, interpolation='nearest')
+    window_rate = 2 * sample_rate / window_size # windows per second
+
+    axes = gca()
+    axes.imshow(t(x), origin='lower', aspect='auto', interpolation='nearest')
+
+    axes.get_xaxis().set_major_locator(
+        LinearLocator(1 + ceil(n_windows/window_rate)))
+    axes.get_xaxis().set_major_formatter(
+        FuncFormatter(lambda x,y: '%ds' % round(x/window_rate)))
+
+    axes.get_yaxis().set_major_locator(
+                LinearLocator(2*d+1))
+    axes.get_yaxis().set_major_formatter(
+        FuncFormatter(lambda x,y: '%s' % (freqs[(y-1)//2][0] if odd(y) else '')))# if y>0 and y<d else ''))
+    draw()
+
     show()
 
 """

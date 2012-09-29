@@ -17,7 +17,8 @@ hanning_window = hanning(window_size)
 
 
 # spectrum :: |windows| by |frequencies|
-#  |windows| / 2 * |frequencies| ~ |seconds| * |sample_rate|
+#  |frequencies| = |window|
+#  |windows| / 2 * |frequencies| ~ |seconds| * sample_rate
 def process_wav(file):
     print 'processing %s' % file
 
@@ -38,36 +39,41 @@ def process_wav(file):
         true_spectrum[i,:] = fft(window)
         spectrum[i,:] = abs(true_spectrum[i,:])
 
-    return spectrum, true_spectrum
+    return spectrum, sample_rate
 
 
 def to_freq(file): return int(basename(file)[1:])
 
-def train_joint(data = [glob('train/piano/*.wav')]):
-#def train_joint(data = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
+def train_joint(dataset = [glob('train/piano/*.wav')]):
+#def train_joint(dataset = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
     print
     print 'TRAINING...'
     
-    n  = len(flatten(data))
+    n  = len(flatten(dataset))
     print 'n =', n
 
     classifier = zeros((n, window_size))
     
-    data = [sorted(files, key=to_freq) for files in data]
+    dataset = [sorted(data, key=to_freq) for data in dataset]
+#    def instrument(file): 
+#    dataset = [instrument(file) for file in flatten(dataset)]
     #  sort filenames by frequency ascending
-
-    freqs = [note(to_freq(file)) for file in flatten(data)]
+    
+    freqs = flatten(
+        [sorted([note(to_freq(file)) for file in data],
+                key=snd) 
+#                [tuple([ ('(%s) %s' % (instrument(file),k),f) for k,f note(to_freq(file))]) 
+         for data in dataset])
     #  keep track of file's pitch
     #  eg 'A440.wav' => 440
     
-    for i,file in enumerate(flatten(data)):
+    for i,file in enumerate(flatten(dataset)):
         spec, _ = process_wav(file)
         
         # normalize to unit vector
         classifier[i,:] = sum(spec,0) / sum(spec)
         #note  sum by default reduces along all dims to scalar
         
-    freqs = sorted(set(freqs),key=snd)
 #    print
 #    print 'freqs...'
 #    for freq in freqs: print freq
