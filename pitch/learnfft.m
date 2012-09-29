@@ -31,6 +31,16 @@ for i = 1:nWindows-2
     spectrum(i,:) = abs(fft(myWindow1));
 end
 
+%% NMF BITCH
+[spectra, coeff] = nnmf(spectrum' ,12);%, 'w0', classifier');
+
+%%
+firstNote = spectra(:, 7);
+in = ifft(firstNote);
+in = repmat(in, 10, 1);
+player = audioplayer(in, 44100);
+play(player);
+
 %% Pseudoinverse solution
 
 M = pinv(classifier)';
@@ -101,7 +111,7 @@ end
 %% Graph output
 
 output = fliplr(spectra); % to print right
-surf([output zeros(nWindows,1)]); % need extra padding for surf (wtf)
+surf([coeff' zeros(nWindows,1)]); % need extra padding for surf (wtf)
 
 %% Generate spectra time lapse
 for i = 1:nWindows
