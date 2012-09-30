@@ -97,13 +97,13 @@ def pitch_nmf():
         b = spectrum[i,:] / sum(spectrum[i,:])
         
         # multiplicative update with euclidean distance
-        for k in xrange(10): # until convergence
+        for k in xrange(20): # until convergence
             numer = dot( A, b ) #: (d,)
             denom = mul( A, t(A), x[i,:] ) #: (d,sr) * (sr,d) * (d,) = (d,)
             x[i,:] = x[i,:] * numer / denom #:(d,)
-
-    return x
             
+    return x
+
 
 # gradient descent solution (ie with additive update)
 def pitch_gd():
@@ -121,21 +121,26 @@ def pitch(how='nmf'):
     except KeyError:
         raise ValueError('\n'.join(["pitch()...", " wants how={'nmf'|'pinv'|'gd'}", " got how=%s" % how]))
 
-# main
+
+#Main
 x = pitch(how)
-#x = (x-x.min())/(x.max()-x.min())
-#x=log(x)
-#top_percent = 100 # threshold at brightest top_percentage%
-#top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1]
-#dullest = x < top_percentile
-#x[dullest] = 0
+eps = 0.0001
+x = eps + (x-x.min())/(x.max()-x.min()) # make positive for logarithm
+x=log(x)
+
 print x.min()
 print x.max()
 print x.shape
-n_windows = x.shape[0]
-d = x.shape[1]
 
-# plot
+x = (x-x.min()) # normalize to 0 min
+top_percent = 25 # threshold at brightest top_percentage%
+top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1] # sort desc
+dullest = x < top_percentile
+x[dullest] = 0
+x[x==0]    = eps
+
+
+#Plot
 # x-axis = time in seconds
 #  window_rate = sample_rate / sample_size * 2
 #  j => j / window_rate
@@ -143,6 +148,9 @@ d = x.shape[1]
 #  i => freqs[i]
 
 if __name__=='__main__':
+    n_windows = x.shape[0]
+    d = x.shape[1]
+
     window_rate = 2 * sample_rate / window_size # windows per second
 
     axes = gca()

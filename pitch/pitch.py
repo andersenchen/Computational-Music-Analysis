@@ -44,8 +44,8 @@ def process_wav(file):
 
 def to_freq(file): return int(basename(file)[1:])
 
-def train_joint(dataset = [glob('train/piano/*.wav')]):
-#def train_joint(dataset = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
+#def train_joint(dataset = [glob('train/piano/*.wav')]):
+def train_joint(dataset = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
     print
     print 'TRAINING...'
     
