@@ -28,21 +28,23 @@ def pitch_detection_algorithm(s):
 
 # cli
 p=argparse.ArgumentParser(description="Pitch Detection")
-p.add_argument('how', type=pitch_detection_algorithm, nargs='?', default='nmf',
+p.add_argument('file', type=str)
+p.add_argument('how', type=pitch_detection_algorithm,
+               nargs='?', default='nmf',
                help='nmf | pinv | gd')
 args = p.parse_args()
-how = args.how
+file = args.file
+how  = args.how
 
 # train classifier
 classifier, freqs = train_joint()
 #  classifier :: |notes| by window_size
 
 # read file
-file = 'chord.wav'
 spectrum, sample_rate = process_wav(file)
 
 # consts
-n_windows = spectrum.shape[0]
+nWindows = spectrum.shape[0]
 
 # pseudoinverse solution
 # solve Ax=b for x given A,b
@@ -54,19 +56,19 @@ n_windows = spectrum.shape[0]
 # eg d = 8 = |keys in 1 piano 8ve| . d' = 4096 = |linear bins of audible pitches|
 def pitch_pinv():
     Ai = pinv(classifier)
-    x  = zeros((n_windows, classifier.shape[0]))
+    x  = zeros((nWindows, classifier.shape[0]))
 
     print
     print 'PINV...'
     print 'd', classifier.shape[0]
     print 'sr', classifier.shape[1]
-    print 'nW', n_windows
+    print 'nW', nWindows
     print 'us', spectrum.shape
     print 'A', Ai.shape
     print 'b', spectrum[0,:].shape
     print 'x', x.shape
     
-    for i in xrange(n_windows-1):
+    for i in xrange(nWindows-1):
         # nor frequency to unit vector
         b = spectrum[i,:] / sum(spectrum[i,:])
         # x=A\b
@@ -79,20 +81,20 @@ def pitch_pinv():
 # solve Ax=b for x
 #  where x : nonnegative
 def pitch_nmf():
-    d = classifier.shape[0]
+    d, _ = classifier.shape
     A = classifier
-    x = 0.5 * ones((n_windows, d))
+    x = 0.5 * ones((nWindows, d))
     
     print 'NMF...'
     print 'd', d
     print 'sr', classifier.shape[1]
-    print 'nW', n_windows
+    print 'nW', nWindows
     print 'us', spectrum.shape
     print 'A', A.shape
     print 'b', spectrum[0,:].shape
     print 'x', x.shape
     
-    for i in xrange(n_windows-1):
+    for i in xrange(nWindows-1):
         # normalize to unit vector
         b = spectrum[i,:] / sum(spectrum[i,:])
         
@@ -132,13 +134,13 @@ print x.min()
 print x.max()
 print x.shape
 
-x = (x-x.min()) # normalize to 0 min
+#NOTE wtf!?
+#  i ran this code three times within several seconds, it gave 3 diff plots, only the 3rd looked like the run a few minutes ago.
+x = (x-x.min())/(x.max()-x.min()) # normalize to 0 min
 top_percent = 25 # threshold at brightest top_percentage%
 top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1] # sort desc
 dullest = x < top_percentile
 x[dullest] = 0
-x[x==0]    = eps
-
 
 #Plot
 # x-axis = time in seconds
@@ -148,16 +150,16 @@ x[x==0]    = eps
 #  i => freqs[i]
 
 if __name__=='__main__':
-    n_windows = x.shape[0]
-    d = x.shape[1]
+    nWindows, d = x.shape
 
     window_rate = 2 * sample_rate / window_size # windows per second
 
     axes = gca()
-    axes.imshow(t(x), origin='lower', aspect='auto', interpolation='nearest')
+    axes.imshow(t(x), cmap=cm.jet, origin='lower', aspect='auto', interpolation='nearest')
 
+    axes.set_title('Transcription')
     axes.get_xaxis().set_major_locator(
-        LinearLocator(1 + ceil(n_windows/window_rate)))
+        LinearLocator(1 + ceil(nWindows/window_rate)))
     axes.get_xaxis().set_major_formatter(
         FuncFormatter(lambda x,y: '%ds' % round(x/window_rate)))
 

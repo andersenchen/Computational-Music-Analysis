@@ -24,12 +24,18 @@ def process_wav(file):
 
     sample_rate, audio = wavfile.read(file)
     #  audio :: |samples| by |channels|
+    if len(audio.shape)==1:
+        nSamples, = audio.shape
+        nChannels = 1
+        audio = audio[:int32(nSamples)]
+    else:
+        nSamples, nChannels = audio.shape
+        audio = audio[:int32(nSamples), 0]
 
-    audio = audio[:int32(audio.shape)[0], 0]
     #  keep first channel
     #  keep first 2^31 samples
     n_windows = int32(audio.size/window_size *2) # double <- overlap windows
-
+    
     spectrum = zeros((n_windows,window_size))
     true_spectrum = spectrum.copy()
 
@@ -44,8 +50,8 @@ def process_wav(file):
 
 def to_freq(file): return int(basename(file)[1:])
 
-#def train_joint(dataset = [glob('train/piano/*.wav')]):
-def train_joint(dataset = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
+def train_joint(dataset = [glob('train/piano/*.wav')]):
+#def train_joint(dataset = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
     print
     print 'TRAINING...'
     
