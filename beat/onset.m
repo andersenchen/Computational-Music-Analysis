@@ -2,19 +2,19 @@ clear all;
 
 %% Load audio file
 
-[y, Fs] = wavread('scale.wav');
+[y, Fs] = wavread('king.wav',44100*15);
 
 % only get first channel (two if stereo)
 % only get first 15 secs (current onset computation is slow)
-channel = y(1:(min(end,Fs*15)),1);
+channel = y(1:end,1);
 
 %% Time plot
-plot(channel)
+plot(channel);
 
 %% STFT
 
 % size of each window (can play with this if you want)
-windowSize = 2^10;
+windowSize = 2^12;
 
 nWindows = floor(numel(channel)/windowSize*2);
 spec = zeros(windowSize,nWindows-2);
@@ -33,15 +33,51 @@ end
 %% Stationary spectrum
 image(255*spec/max(max(spec)));
 
+%% Derivative
+dsdt = spec(1:end,2:end) - spec(1:end,1:(end-1));
+ds2dt2 = dsdt(1:end,2:end) - dsdt(1:end,1:(end-1));
+
+%% Stationary derivative
+image(255*dsdt/max(max(dsdt)));
+
+%% Stationary accel
+image(255*ds2dt2/max(max(ds2dt2)));
+
+%% Weighted spectrum
+weights = repmat([(1:size(spec,1)/2).^2'; (size(spec,1)/2:-1:1).^2'],1,size(spec,2));
+wspec = spec .* weights;
+dwdt = wspec(1:end,2:end) - wspec(1:end,1:(end-1));
+
+%% Stationary weighted spectrum
+%image(255*weights/max(max(weights)));
+image(255*wspec/max(max(wspec)));
+
+%% Euclidean distance
+dist = sum((spec(1:end,2:end) - spec(1:end,1:(end-1))).^2)
+
+%% Sum of frequencies
+subplot(6,1,1);
+plot(sum(spec));
+subplot(6,1,2);
+plot(max(0,sum(dsdt)));
+subplot(6,1,3);
+plot(max(0,sum(ds2dt2)));
+subplot(6,1,4);
+plot(sum(wspec));
+subplot(6,1,5);
+plot(max(0,sum(dwdt)));
+subplot(6,1,6);
+plot(max(0,dist));
+
 %% Compute onsets (very poor algorithm)
 processed = [];
 lockout = -1;
-for i = 1:size(spec,2)
+for i = 1:size(dsdt,2)
     i
     onset = 0; % guess no onset
     for bucket = 1:windowSize
-        history = spec(bucket,floor(max(1,i-Fs/windowSize)):i);
-        if(spec(bucket,i) > mean(history) + 6*std(history))
+        history = dsdt(bucket,floor(max(1,i-Fs/windowSize)):i);
+        if(dsdt(bucket,i) > mean(history) + 6*std(history))
             onset = 1; % detected energy variation > 6sigma from mean
         end
     end
@@ -55,6 +91,33 @@ for i = 1:size(spec,2)
     
     lockout = lockout - 1;
 end
+
+%% Compute onsets (sum)
+input = max(0,dist);
+
+processed = [];
+lockout = -1;
+for i = 1:size(input,2)
+    i
+    onset = 0; % guess no onset
+    s = sum(input(:,i));
+    
+    history = input(:,floor(max(1,i-3*Fs/windowSize)):i);
+    if(s > mean(history) + 1*std(history))
+        onset = 1; % detected energy variation
+    end
+
+    if (onset == 1 && lockout < 0)
+        fprintf('onset\n')
+        processed = [processed i*windowSize/2];
+        
+        % don't let onsets pile up on each other
+        lockout = floor(Fs/(windowSize*4))
+    end
+    
+    lockout = lockout - 1;
+end
+
 
 %% Mark onsets aurally
 

@@ -73,18 +73,22 @@ end
 
 %% Graphs and stuff
 
-% deviation from (known) hidden beat state
-subplot(4,1,1)
+% deviation of actual beat from (known) hidden beat state
+subplot(5,1,1)
 plot(results(1:end,1) - results(1:end,2));
 
 % deviation of predicted beat from actual beat
-subplot(4,1,2)
+subplot(5,1,2)
 plot(results(1:end,2) - results(1:end,3));
 
-% deviation of predicted beat from actual beat
-subplot(4,1,3)
-plot(results(1:end,2) - results(1:end,3));
+% deviation of predicted beat from hidden beat
+subplot(5,1,3)
+plot(results(1:end,1) - results(1:end,3));
 
 % deviation of predicted tempo from actual tempo
-subplot(4,1,4)
+subplot(5,1,4)
 plot(results(1:end,4));
+
+% probability of observed beat given kalman state
+subplot(5,1,5)
+plot(results(1:end,5));
