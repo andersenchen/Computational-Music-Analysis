@@ -60,7 +60,7 @@ def plot_fft(signal, samples, sample_rate):
     xs = half(freqs)
     ys = normalize(half(spectrum))
     scatter(xs, ys)
-    xscale('log')
+#    xscale('log')
 #    axis(get_axes(xs,ys))
     show()
 

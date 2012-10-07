@@ -50,3 +50,14 @@ def snd(x): return x[1]
 # to nearest integer
 #:: Real => Int
 def round(n): return int(n+0.5)
+
+def onechannel(audio):
+    if len(audio.shape)==1:
+        nSamples, = audio.shape
+        nChannels = 1
+        audio = audio[:int32(nSamples)]
+    else:
+        nSamples, nChannels = audio.shape
+        audio = audio[:int32(nSamples), 0]
+
+    return audio, nSamples, nChannels

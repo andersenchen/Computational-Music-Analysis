@@ -1,8 +1,10 @@
 #!/usr/bin/python -W ignore::Warning
 from __future__ import division
-from sam import *
 
 from fft import *
+from numpy import *
+
+from sam import *
 
 K = 0
 F = 1
@@ -70,29 +72,59 @@ max(audio) == 2**31
 # half(fftfreq(n,d)) => [0/n 1/n 2/n ... 1/2) / d
 # half(fftfreq(8,1)) => [0/8 1/8 2/8 3/8]
 
-def print_freqs(freqs, k=10, simplify=round):
-    for ((n,u),e) in freqs[:k]: print '\t'.join([n, str(simplify(e))])
+def sort_fft(freqs, spectrum):
+    return sorted( zip(half(freqs), half(spectrum)), reverse=True, key=lambda ue: ue[1] )
+
+def print_fft(fft, k=10, simplify=round):
+    for (u,e) in fft[:k]: print '\t'.join([str(note(u)), str(simplify(e))])
 
 def main(filename, gui):
+    if gui:
+        import time
+        ion()
+
     window_size = 1024
+    hanning_window = hanning(window_size)
 
     from scipy.io import wavfile
     sample_rate, audio = wavfile.read(filename)
-    #audio = audio - mean(audio) #normalize
+    audio, _, _ = onechannel(audio) # casts nChannels to 1
+    audio = audio - mean(audio) #normalize
     
     #eg 44100 // 1024 * 1024 == 4032 (ignore last few samples for consistent signal size)
     start = sample_rate # start at 1 second
+    k     = 3
+    fs    = []
+    ss    = []
     for t in arange(start, 
                     start + (sample_rate // window_size) * window_size,
                     window_size):
-        signal = audio[t : t+window_size]
-        freqs, spectrum = fft_(signal, window_size, sample_rate)
-        #print filter(lambda x: smooth(x[1], eps=1), zip(half(freqs), half(spectrum)) )
 
-        top_freqs = sorted( zip(map(note, half(freqs)), half(spectrum)), reverse=True, key=lambda ue: ue[1] )
-        print_freqs(top_freqs)
-        if gui: plot_fft(signal, window_size, sample_rate)
-        break
+        signal = audio[t : t+window_size] * hanning_window
+        freqs, spectrum = fft_(signal, window_size, sample_rate)
+        fs.append(freqs)
+        ss.append(spectrum)
+
+    ymin = min( min(ys) for ys in ss )
+    ymax = max( max(ys) for ys in ss )
+    for freqs,spectrum in zip(fs,ss):
+
+        #print filter(lambda x: smooth(x[1], eps=1), zip(half(freqs), half(spectrum)) )
+        top = sort_fft(freqs, spectrum)[:k]
+        print
+        print_fft(top)
+    
+        if gui:
+            xs = half(freqs)
+            ys = half(spectrum)
+
+            gcf().clear()
+            ylim( ymin, ymax )
+            xscale('log')
+            plot(xs,ys,'o-')
+            draw()
+
+            time.sleep(1/40)
 
 if __name__=='__main__':
     import argparse
@@ -100,5 +132,7 @@ if __name__=='__main__':
     parser.add_argument('-gui', dest='gui', action='store_true', default=False, help='whether to show plot')
     parser.add_argument('filename', help='the audio file to fft')
     args = parser.parse_args()
-    
-    main(args.filename, args.gui)
+
+    filename = args.filename
+    gui = args.gui
+    main(filename,gui)
