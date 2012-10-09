@@ -1,38 +1,17 @@
-clear all;
-
-%% Artificial data input (onsets)
-
-% generate on the beat onsets
-%actual = (1:100);
-
-% generate rhythmically interesting onsets
-actual = [1 2 3 4 5 6 6.5 7 8 9 10 10.25 10.5 10.75 11 12 13 13.5 14 15 16 17 18 20 22 24 26];
-
-% generate slow onsets
-%actual = (.5:25.5) * 2;
-
-processed = actual .* 44100; % tempo is 44100; i.e. 60bmp
-
-% add some gaussian noise
-std = 44100*0.05;
-for i = 1:size(processed, 2)
-    processed(i) = processed(i) + randn()*std;
-end
-
 %% Initialize
 
 % score positions
-tests = [sym(1/4) sym(1/2) sym(3/4) sym(1)];
+tests = [sym(1/4) sym(1/3) sym(1/2) sym(2/3) sym(3/4) sym(1)];
 S = numel(tests);
 
 % parameters (todo: learn these a la Gibbs)
-q = 100;    % this is the innovation covariance parameter
+q = 10;    % this is the innovation covariance parameter
             % start with a big q, lock it down after burn-in period
 
-Rk = std;   % this is the noise covariance parameter
+Rk = 44100*.05;   % this is the noise covariance parameter
             % cheat and copy actual noise covariance for now
             
-lambda = .5; % particle filter score positions prior parameter
+lambda = 1; % particle filter score positions prior parameter
             
 
 % constants
@@ -56,7 +35,9 @@ oldPk = 44100.*ones([2,2])./2;
 % (this assumption's not necessarily correct in general--think pick-ups)
 % second element: guess "randomly" that tempo is 35000
 % (obviously we know that it's really 44100, but assume we don't know that)
-oldxk = [processed(1) 38000]';
+%oldxk = [processed(1) (processed(2)-processed(1))]';
+oldxk = [processed(1) 22050]';
+xklog = oldxk;
 
 % old score position
 oldck = sym(0);
@@ -66,9 +47,18 @@ score = zeros(size(processed));
 
 % Particle filter %
 
+% again, assume first onset is on the beat; i.e. it is the first beat
+beats = [processed(1)];
 for k = 2:numel(processed)
     k
     yk = processed(k); %onset position
+    
+    % interpolate missing beats
+    lastb = beats(end);
+    while (lastb + 1.5*oldxk(2) < processed(k))
+        beats = [beats (lastb + oldxk(2))];
+        lastb = lastb + oldxk(2);
+    end
     
     % This is how you solve burn-in (start with big q and make it small later)
     if k == 30
@@ -117,21 +107,46 @@ for k = 2:numel(processed)
     oldck = ck(idx);
     
     score(k) = ck(idx)
+    xklog = [xklog [oldxk]];
+    
+    if (mod(score(k),1) == 0) % if a beat
+        beats = [beats yk];
+    end
 end
 
-%% Results
+%% Graph results
 
-% difference (in seconds) from score positions to note onsets
+% plot onsets
 subplot(4,1,1);
-scatter(1+score,1 + score - processed/44100);
-axis([1,actual(end),-1,1]);
+scatter(processed,ones(numel(processed),1))
+axis([processed(1),processed(end),0,2]);
 
-% rhythmic representation of guesses
+% plot score positions
 subplot(4,1,2);
-scatter(1+score,ones(numel(score),1))
-axis([1,actual(end),0,2]);     
+scatter(score.*xklog(2,1:end) + processed(1),ones(numel(score),1))
+axis([processed(1),processed(end),0,2]);
 
-% rhythmic representation of actual
+% score versus onset error
 subplot(4,1,3);
-scatter(actual,ones(numel(actual),1))
-axis([1,actual(end),0,2]);
+scatter(score.*xklog(2,1:end) + processed(1), (score.*xklog(2,1:end) + processed(1) - processed)/44100);
+axis([processed(1),processed(end),-1,1]);
+
+% beats
+subplot(4,1,4);
+scatter(beats, ones(numel(beats),1))
+axis([beats(1),beats(end),0,2]);
+
+%% Mark beats aurally
+
+output = channel;
+mark = 3/4*sin((2*pi/(44100/440))*(0:1:floor(Fs/44.1)));
+for i = 1:size(beats,2)
+    for j = 1:numel(mark)
+        ind = round(beats(i))+j-250; % todo: how can beats be non-integral?
+        output(ind) = output(ind)*0.25;
+        output(ind) = output(ind)+mark(j);
+    end
+end
+
+%% Write annotated .wav file
+wavwrite(output, Fs, 'beats.wav');
