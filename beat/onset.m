@@ -2,7 +2,7 @@ clear all;
 
 %% Load audio file
 
-[y, Fs] = wavread('king.wav',44100*15);
+[y, Fs] = wavread('top.wav',44100*60);
 
 % only get first channel (two if stereo)
 % only get first 15 secs (current onset computation is slow)
@@ -93,7 +93,7 @@ for i = 1:size(dsdt,2)
 end
 
 %% Compute onsets (sum)
-input = max(0,dist);
+input = sum(dwdt);
 
 processed = [];
 lockout = -1;
@@ -103,7 +103,7 @@ for i = 1:size(input,2)
     s = sum(input(:,i));
     
     history = input(:,floor(max(1,i-3*Fs/windowSize)):i);
-    if(s > mean(history) + 1*std(history))
+    if(s > mean(history) + 1.5*std(history))
         onset = 1; % detected energy variation
     end
 
@@ -112,12 +112,15 @@ for i = 1:size(input,2)
         processed = [processed i*windowSize/2];
         
         % don't let onsets pile up on each other
-        lockout = floor(Fs/(windowSize*4))
+        lockout = floor(Fs/(windowSize*2))
     end
     
     lockout = lockout - 1;
 end
 
+%% Plot onsets
+
+scatter(processed,ones(numel(processed),1))
 
 %% Mark onsets aurally
 
