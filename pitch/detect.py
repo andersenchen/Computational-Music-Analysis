@@ -93,7 +93,8 @@ def pitch_nmf():
     print 'A', A.shape
     print 'b', spectrum[0,:].shape
     print 'x', x.shape
-    
+
+    # assumes samples independent
     for i in xrange(nWindows-1):
         # normalize to unit vector
         b = spectrum[i,:] / sum(spectrum[i,:])
@@ -150,6 +151,9 @@ x[dullest] = 0
 #  i => freqs[i]
 
 if __name__=='__main__':
+    ion()
+    import time
+
     nWindows, d = x.shape
 
     window_rate = 2 * sample_rate / window_size # windows per second
@@ -168,8 +172,11 @@ if __name__=='__main__':
     axes.get_yaxis().set_major_formatter(
         FuncFormatter(lambda x,y: '%s' % (freqs[(y-1)//2][0] if odd(y) else '')))# if y>0 and y<d else ''))
     draw()
+    
+    time.sleep(60)
 
-    show()
+    #show()
+
 
 """
 from mpl_toolkits.mplot3d import Axes3D

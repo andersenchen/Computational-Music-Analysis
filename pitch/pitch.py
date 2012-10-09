@@ -34,12 +34,12 @@ def process_wav(file):
 
     #  keep first channel
     #  keep first 2^31 samples
-    n_windows = int32(audio.size/window_size *2) # double <- overlap windows
+    nWindows = int32(audio.size/window_size *2) # double <- overlap windows
     
-    spectrum = zeros((n_windows,window_size))
+    spectrum = zeros((nWindows,window_size))
     true_spectrum = spectrum.copy()
 
-    for i in xrange(0,n_windows-1):
+    for i in xrange(0,nWindows-1):
         t = int32(i* window_size/2)
         window = audio[t : t+window_size] * hanning_window # elemwise mult
         true_spectrum[i,:] = fft(window)
