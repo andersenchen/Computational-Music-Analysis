@@ -38,7 +38,7 @@ how  = args.how
 # train classifier
 piano = [glob('train/piano/*.wav')]
 cello = [glob('train/cello/*.wav')]
-dataset = piano# + cello
+dataset = piano + cello
 # classifier :: |notes| by window_size
 classifier, freqs = train_joint(dataset)
 
@@ -57,26 +57,19 @@ nWindows = spectrum.shape[0]
 # d' = dimensionality of observed var
 # eg d = 8 = |keys in 1 piano 8ve| . d' = 4096 = |linear bins of audible pitches|
 def pitch_pinv():
-    Ai = pinv(classifier)
-    x  = zeros((nWindows, classifier.shape[0]))
-
-    print
-    print 'PINV...'
-    print 'd', classifier.shape[0]
-    print 'sr', classifier.shape[1]
-    print 'nW', nWindows
-    print 'us', spectrum.shape
-    print 'A', Ai.shape
-    print 'b', spectrum[0,:].shape
-    print 'x', x.shape
+    A  = classifier
+    Ai = pinv(A)
+    B  = spectrum / sum(spectrum)
+    X  = zeros((nWindows, classifier.shape[0]))
     
-    for i in xrange(nWindows-1):
-        # nor frequency to unit vector
-        b = spectrum[i,:] / sum(spectrum[i,:])
-        # x=A\b
-        x[i,:] = dot( t(Ai), b )
-        
-    return x
+    print 'PINV...'
+    print 'A', A.shape
+    print 'Ai', Ai.shape
+    print 'X', X.shape
+    print 'B', B.shape
+    X = dot( B, Ai )
+    
+    return X
 
 
 # nmf solution (ie with multiplicative update)
@@ -103,6 +96,7 @@ def pitch_nmf():
     print 'x', X.shape
     print
     """
+    print 'NMF...'
     print 'A', A.shape
     print 'X', X.shape
     print 'B', B.shape
@@ -132,7 +126,6 @@ def pitch(how='nmf'):
         raise ValueError('\n'.join(["pitch()...", " wants how={'nmf'|'pinv'|'gd'}", " got how=%s" % how]))
 
 
-
 def threshold(x):
     eps = 0.0001
     x = eps + (x-x.min())/(x.max()-x.min()) # make positive for logarithm
@@ -146,6 +139,7 @@ def threshold(x):
     x[dullest] = 0
 
     return x
+
 
 #Main
 x = pitch(how)
@@ -179,8 +173,8 @@ if __name__=='__main__':
                 LinearLocator(2*d+1))
     axes.get_yaxis().set_major_formatter(
         FuncFormatter(lambda x,y: '%s' % (freqs[(y-1)//2][0] if odd(y) else '')))# if y>0 and y<d else ''))
+
     draw()
-    
     time.sleep(60)
     
     #show()
