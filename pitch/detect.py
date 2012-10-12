@@ -9,7 +9,6 @@ from __future__ import division
 
 from compmusic.sambo.sam import *
 from pitch import *
-#from train_joint import train_joint
 
 from numpy import *
 from numpy.fft import fft
@@ -37,8 +36,11 @@ file = args.file
 how  = args.how
 
 # train classifier
-classifier, freqs = train_joint()
-#  classifier :: |notes| by window_size
+piano = [glob('train/piano/*.wav')]
+cello = [glob('train/cello/*.wav')]
+dataset = piano# + cello
+# classifier :: |notes| by window_size
+classifier, freqs = train_joint(dataset)
 
 # read file
 spectrum, sample_rate = process_wav(file)
@@ -82,9 +84,15 @@ def pitch_pinv():
 #  where x : nonnegative
 def pitch_nmf():
     d, _ = classifier.shape
-    A = classifier
-    x = 0.5 * ones((nWindows, d))
+    A = t(classifier)               #eg 1024, 8
+    X = 0.5 * ones((d, nWindows))   #eg 8, 60
+    B = t(spectrum / sum(spectrum)) #eg 1024, 60
+
+    # ignore last sample
+    X = X[:,:-1]
+    B = B[:,:-1]
     
+    """
     print 'NMF...'
     print 'd', d
     print 'sr', classifier.shape[1]
@@ -92,26 +100,25 @@ def pitch_nmf():
     print 'us', spectrum.shape
     print 'A', A.shape
     print 'b', spectrum[0,:].shape
-    print 'x', x.shape
-
-    # assumes samples independent
-    for i in xrange(nWindows-1):
-        # normalize to unit vector
-        b = spectrum[i,:] / sum(spectrum[i,:])
-        
-        # multiplicative update with euclidean distance
-        for k in xrange(20): # until convergence
-            numer = dot( A, b ) #: (d,)
-            denom = mul( A, t(A), x[i,:] ) #: (d,sr) * (sr,d) * (d,) = (d,)
-            x[i,:] = x[i,:] * numer / denom #:(d,)
+    print 'x', X.shape
+    print
+    """
+    print 'A', A.shape
+    print 'X', X.shape
+    print 'B', B.shape
+    
+    # jointly solve Ax=b forall samples
+    # multiplicative update with euclidean distance
+    for k in xrange(20): # until convergence
+        numer = dot( t(A), B )    #: 8,1024 * 1024,60
+        denom = mul( t(A), A, X ) #: 8,1024 * 1024,8 * 8,60
+        X = X * numer / denom
             
-    return x
+    return t(X)
 
 
 # gradient descent solution (ie with additive update)
 def pitch_gd():
-    
-
     print
     print 'GD...'
 
@@ -125,23 +132,24 @@ def pitch(how='nmf'):
         raise ValueError('\n'.join(["pitch()...", " wants how={'nmf'|'pinv'|'gd'}", " got how=%s" % how]))
 
 
+
+def threshold(x):
+    eps = 0.0001
+    x = eps + (x-x.min())/(x.max()-x.min()) # make positive for logarithm
+    x=log(x)
+    # NOTE wtf!?
+    #  i ran this code three times within several seconds, it gave 3 diff plots, only the 3rd looked like the run a few minutes ago.
+    x = (x-x.min())/(x.max()-x.min()) # normalize to 0 min
+    top_percent = 25 # threshold at brightest top_percentage%
+    top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1] # sort desc
+    dullest = x < top_percentile
+    x[dullest] = 0
+
+    return x
+
 #Main
 x = pitch(how)
-eps = 0.0001
-x = eps + (x-x.min())/(x.max()-x.min()) # make positive for logarithm
-x=log(x)
-
-print x.min()
-print x.max()
-print x.shape
-
-#NOTE wtf!?
-#  i ran this code three times within several seconds, it gave 3 diff plots, only the 3rd looked like the run a few minutes ago.
-x = (x-x.min())/(x.max()-x.min()) # normalize to 0 min
-top_percent = 25 # threshold at brightest top_percentage%
-top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1] # sort desc
-dullest = x < top_percentile
-x[dullest] = 0
+#x = threshold(x)
 
 #Plot
 # x-axis = time in seconds
@@ -174,7 +182,7 @@ if __name__=='__main__':
     draw()
     
     time.sleep(60)
-
+    
     #show()
 
 
