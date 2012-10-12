@@ -2,7 +2,7 @@ clear all;
 
 %% Load audio file
 
-[y, Fs] = wavread('top.wav',44100*60);
+[y, Fs] = wavread('fugue.wav',44100*30);
 
 % only get first channel (two if stereo)
 % only get first 15 secs (current onset computation is slow)
@@ -30,12 +30,23 @@ for i = 1:nWindows
     pause(windowSize/Fs);
 end
 
-%% Stationary spectrum
-image(255*spec/max(max(spec)));
+%% Derived signals
 
-%% Derivative
+% Derivative
 dsdt = spec(1:end,2:end) - spec(1:end,1:(end-1));
 ds2dt2 = dsdt(1:end,2:end) - dsdt(1:end,1:(end-1));
+
+% Weighted spectrum
+weights = repmat([(1:size(spec,1)/2).^2'; (size(spec,1)/2:-1:1).^2'],1,size(spec,2));
+wspec = spec .* weights;
+dwdt = wspec(1:end,2:end) - wspec(1:end,1:(end-1));
+dw2dt2 = dwdt(1:end,2:end) - dwdt(1:end,1:(end-1));
+
+% Euclidean distance
+dist = sum((spec(1:end,2:end) - spec(1:end,1:(end-1))).^2)
+
+%% Stationary spectrum
+image(255*spec/max(max(spec)));
 
 %% Stationary derivative
 image(255*dsdt/max(max(dsdt)));
@@ -43,30 +54,32 @@ image(255*dsdt/max(max(dsdt)));
 %% Stationary accel
 image(255*ds2dt2/max(max(ds2dt2)));
 
-%% Weighted spectrum
-weights = repmat([(1:size(spec,1)/2).^2'; (size(spec,1)/2:-1:1).^2'],1,size(spec,2));
-wspec = spec .* weights;
-dwdt = wspec(1:end,2:end) - wspec(1:end,1:(end-1));
-
 %% Stationary weighted spectrum
 %image(255*weights/max(max(weights)));
 image(255*wspec/max(max(wspec)));
 
-%% Euclidean distance
-dist = sum((spec(1:end,2:end) - spec(1:end,1:(end-1))).^2)
+%% Stationary weighted derivative
+%image(255*weights/max(max(weights)));
+image(255*dwdt/max(max(dwdt)));
+
+%% Stationary weighted accel
+%image(255*weights/max(max(weights)));
+image(255*dw2dt2/max(max(dw2dt2)));
 
 %% Sum of frequencies
-subplot(6,1,1);
+subplot(7,1,1);
 plot(sum(spec));
-subplot(6,1,2);
+subplot(7,1,2);
 plot(max(0,sum(dsdt)));
-subplot(6,1,3);
+subplot(7,1,3);
 plot(max(0,sum(ds2dt2)));
-subplot(6,1,4);
+subplot(7,1,4);
 plot(sum(wspec));
-subplot(6,1,5);
+subplot(7,1,5);
 plot(max(0,sum(dwdt)));
-subplot(6,1,6);
+subplot(7,1,6);
+plot(max(0,sum(dw2dt2)));
+subplot(7,1,7);
 plot(max(0,dist));
 
 %% Compute onsets (very poor algorithm)
@@ -103,7 +116,7 @@ for i = 1:size(input,2)
     s = sum(input(:,i));
     
     history = input(:,floor(max(1,i-3*Fs/windowSize)):i);
-    if(s > mean(history) + 1.5*std(history))
+    if(s > mean(history) + 1.25*std(history))
         onset = 1; % detected energy variation
     end
 
@@ -112,7 +125,7 @@ for i = 1:size(input,2)
         processed = [processed i*windowSize/2];
         
         % don't let onsets pile up on each other
-        lockout = floor(Fs/(windowSize*2))
+        lockout = floor(Fs/(windowSize*4))
     end
     
     lockout = lockout - 1;

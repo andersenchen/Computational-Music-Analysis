@@ -10,6 +10,7 @@ q = 10;    % this is the innovation covariance parameter
 
 Rk = 44100*.05;   % this is the noise covariance parameter
             % cheat and copy actual noise covariance for now
+%Rk = 44100*.01;
             
 lambda = 1; % particle filter score positions prior parameter
             
@@ -28,6 +29,9 @@ ck = sym(zeros(S,1));  % current score position
 % weight of each score position
 weights = ones(S,1);
 
+% old weights
+oldweights = log(1);
+
 % initialize this (this may not be an optimal initial state)
 oldPk = 44100.*ones([2,2])./2;
 
@@ -36,19 +40,21 @@ oldPk = 44100.*ones([2,2])./2;
 % second element: guess "randomly" that tempo is 35000
 % (obviously we know that it's really 44100, but assume we don't know that)
 %oldxk = [processed(1) (processed(2)-processed(1))]';
-oldxk = [processed(1) 22050]';
+%oldxk = [processed(1) 70000]';
+oldxk = [processed(1) 40000]';
 xklog = oldxk;
 
 % old score position
-oldck = sym(0);
+%oldck = sym(0);
+oldck = sym(3/4 - 1/3); % first onset is a pickup
 
 % tallied score positions
 score = zeros(size(processed));
+score(1) = oldck;
 
 % Particle filter %
 
-% again, assume first onset is on the beat; i.e. it is the first beat
-beats = [processed(1)];
+beats = [processed(1) - double(oldck)*oldxk(2)];
 for k = 2:numel(processed)
     k
     yk = processed(k); %onset position
@@ -96,7 +102,7 @@ for k = 2:numel(processed)
         
         ck(s) = oldck + yu; % denormalize the score location
         
-        weights(s) = pyk*pck;
+        weights(s) = oldweights + log(pyk) + log(pck);
     end
     
     [val idx] = max(weights);
@@ -106,10 +112,14 @@ for k = 2:numel(processed)
     oldxk = xk(1:end,1:end,idx);
     oldck = ck(idx);
     
+    oldweights = weights(idx);
+    
     score(k) = ck(idx)
     xklog = [xklog [oldxk]];
     
-    if (mod(score(k),1) == 0) % if a beat
+    % if onset is assigned to a beat
+    % and haven't already assigned an onset to this beat
+    if (mod(score(k),1) == 0 && (score(k) - score(k-1) ~= 0))
         beats = [beats yk];
     end
 end
@@ -123,12 +133,13 @@ axis([processed(1),processed(end),0,2]);
 
 % plot score positions
 subplot(4,1,2);
-scatter(score.*xklog(2,1:end) + processed(1),ones(numel(score),1))
+abspos = cumsum((score(2:end) - score(1:end-1)).*xklog(2,2:end)) + processed(1);
+scatter(abspos,ones(numel(score)-1,1));
 axis([processed(1),processed(end),0,2]);
 
 % score versus onset error
 subplot(4,1,3);
-scatter(score.*xklog(2,1:end) + processed(1), (score.*xklog(2,1:end) + processed(1) - processed)/44100);
+scatter(abspos, (abspos - processed(2:end))/44100);
 axis([processed(1),processed(end),-1,1]);
 
 % beats
@@ -142,6 +153,9 @@ output = channel;
 mark = 3/4*sin((2*pi/(44100/440))*(0:1:floor(Fs/44.1)));
 for i = 1:size(beats,2)
     for j = 1:numel(mark)
+        if(beats(i) < 0)
+            continue; % might be an implicit beat before start (pick-up)
+        end
         ind = round(beats(i))+j-250; % todo: how can beats be non-integral?
         output(ind) = output(ind)*0.25;
         output(ind) = output(ind)+mark(j);
