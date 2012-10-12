@@ -30,7 +30,7 @@ ck = sym(zeros(S,1));  % current score position
 weights = ones(S,1);
 
 % old weights
-oldweights = 1;
+oldweights = log(1);
 
 % initialize this (this may not be an optimal initial state)
 oldPk = 44100.*ones([2,2])./2;
@@ -46,7 +46,7 @@ xklog = oldxk;
 
 % old score position
 %oldck = sym(0);
-oldck = sym(1/2); % first onset is a pickup
+oldck = sym(3/4 - 1/3); % first onset is a pickup
 
 % tallied score positions
 score = zeros(size(processed));
@@ -102,7 +102,7 @@ for k = 2:numel(processed)
         
         ck(s) = oldck + yu; % denormalize the score location
         
-        weights(s) = oldweights*pyk*pck;
+        weights(s) = oldweights + log(pyk) + log(pck);
     end
     
     [val idx] = max(weights);
@@ -111,6 +111,8 @@ for k = 2:numel(processed)
     oldPk = Pk(1:end,1:end,idx);
     oldxk = xk(1:end,1:end,idx);
     oldck = ck(idx);
+    
+    oldweights = weights(idx);
     
     score(k) = ck(idx)
     xklog = [xklog [oldxk]];
