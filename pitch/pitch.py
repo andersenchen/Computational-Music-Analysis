@@ -16,10 +16,14 @@ window_size = 2**12
 hanning_window = hanning(window_size)
 
 
-# spectrum :: |windows| by |frequencies|
-#  |frequencies| = |window|
-#  |windows| / 2 * |frequencies| ~ |seconds| * sample_rate
 def process_wav(file):
+    """ 
+    spectrum, samplerate = process_wav(filename)
+
+    spectrum :: num_windows by window_size
+    |frequencies| = window_size
+    num_windows / 2 * |frequencies| ~ |seconds| * sample_rate
+    """ 
     print 'processing %s' % file
 
     sample_rate, audio = wavfile.read(file)
@@ -31,7 +35,7 @@ def process_wav(file):
     else:
         nSamples, nChannels = audio.shape
         audio = audio[:int32(nSamples), 0]
-
+    
     #  keep first channel
     #  keep first 2^31 samples
     nWindows = int32(audio.size/window_size *2) # double <- overlap windows
@@ -50,8 +54,7 @@ def process_wav(file):
 
 def to_freq(file): return int(basename(file)[1:])
 
-def train_joint(dataset = [glob('train/piano/*.wav')]):
-#def train_joint(dataset = [glob('train/piano/*.wav'), glob('train/cello/*.wav')]):
+def train_joint(dataset):
     print
     print 'TRAINING...'
     
