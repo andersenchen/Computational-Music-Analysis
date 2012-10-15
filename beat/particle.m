@@ -7,7 +7,7 @@ clear all;
 [y, Fs] = wavread('king.wav',44100*30);
 
 % only get first channel (two if stereo)
-channel = y(1:end,1);
+channel = y(:,1);
 processed = fonset(channel, Fs);
 
 %% Initialize
@@ -15,6 +15,9 @@ processed = fonset(channel, Fs);
 % score positions
 tests = [sym(1/4) sym(1/3) sym(1/2) sym(2/3) sym(3/4) sym(1)];
 S = numel(tests);
+
+% number of particles
+N = 3;
 
 % parameters (todo: learn these a la Gibbs)
 q = 10;    % this is the innovation covariance parameter
@@ -33,18 +36,18 @@ I = eye(2);
 %% Particle Filter
 
 % used by Kalman filter
-Pk = zeros([2,2,S]);
-xk = zeros([2,1,S]); % current Kalman position/momentum
-ck = sym(zeros(S,1));  % current score position
+Pk = zeros([2,2,N,S]);
+xk = zeros([2,1,N,S]); % current Kalman position/momentum
+ck = sym(zeros(N,S));  % current score position
 
 % weight of each score position
-weights = ones(S,1);
+weights = ones(N,S);
 
 % old weights
-oldweights = log(1);
+oldweights = zeros(N,1);
 
 % initialize this (this may not be an optimal initial state)
-oldPk = 44100.*ones([2,2])./2;
+oldPk = 44100.*ones([2,2,N])./2;
 
 % first element: assume that first onset is on the beat
 % (this assumption's not necessarily correct in general--think pick-ups)
@@ -52,22 +55,35 @@ oldPk = 44100.*ones([2,2])./2;
 % (obviously we know that it's really 44100, but assume we don't know that)
 %oldxk = [processed(1) (processed(2)-processed(1))]';
 %oldxk = [processed(1) 70000]';
-oldxk = [processed(1) 40000]';
-xklog = oldxk;
+%oldxk = [processed(1) 40000]';
+
+% tempo prior
+oldxk = zeros([2,1,N]);
+%for i = 1:N
+%    oldxk(:, 1, i) = [processed(1) 44100*60/((60+(140/(N-1))*(i-1)))];
+%end
+oldxk(:,:,1) = [processed(1) 40000]';
+oldxk(:,:,2) = [processed(1) 70000]';
+
+xklog = oldxk(:,:,1);
 
 % old score position
 %oldck = sym(0);
 %oldck = sym(1/2);
-oldck = sym(3/4 - 1/3); % first onset is a pickup
+oldck = sym(zeros(N,1));
+for i = 1:N
+    oldck(i) = sym(3/4 - 1/3); % first onset is a pickup
+end
 
 % tallied score positions
 score = zeros(size(processed));
-score(1) = oldck;
+score(1) = oldck(1);
 
 % Particle filter %
 
-beats = [processed(1) - double(oldck)*oldxk(2)];
+beats = [processed(1) - double(oldck(1))*oldxk(2,:,1)];
 for k = 2:numel(processed)
+%for k = 2:2
     k
     yk = processed(k); %onset position
     
@@ -83,51 +99,90 @@ for k = 2:numel(processed)
         q = 0.1;
     end
     
-    for s = 1:S % for each possible elapsed interval
-        y = tests(s);       % normalized current test
-        
-        ykm = round(((yk - oldxk(1))/oldxk(2))/double(y));
-        yu = y * sym(ykm);  % un-normalized current test
-        
-        ck(s) = oldck+y;    % normalized score location given test
-        
-        A = [1 yu; 0 1];    % dynamical system rule
-        
-        % Kalman Predict
-        Qk = q*[y^3/3 y^2/2; y^2/2 y]; % innovation noise covariance
-        Pk(1:end, 1:end,s) = A*oldPk(1:end, 1:end)*A' + Qk;
-        Wk = H*Pk(1:end, 1:end,s)*H'+Rk; % residual (innovation) covariance
-        xk(1:end, 1:end,s) = A*oldxk(1:end, 1:end); % predicted onset/tempo
+    parfor i = 1:N % for each particle
+        for s = 1:S % for each possible elapsed interval
+            y = tests(s);       % normalized current test
 
-        % p(yk|y1:k-1,c1:k):
-        pyk = normpdf(yk, H*xk(1:end,1:end,s), Wk)+eps;
+            ykm = round(((yk - oldxk(1))/oldxk(2))/double(y));
+            yu = y * sym(ykm);  % un-normalized current test
 
-        % Kalman Update
-        residualError = yk - H*xk(1:end, 1:end,s);
-        Kk = Pk(1:end, 1:end,s)*H'*(Wk)^(-1); % optimal Kalman gain
-        xk(1:end, 1:end,s) = xk(1:end, 1:end,s) + Kk*residualError;
-        Pk(1:end, 1:end,s) = (I-Kk*H)*Pk(1:end, 1:end,s);
-        
-        % prior of ck given ck-1
-        [n, d] = numden(sym(ck(s))-sym(floor(ck(s))));
-        pck = double(exp(-lambda*log2(abs(d))));
-        
-        ck(s) = oldck + yu; % denormalize the score location
-        
-        weights(s) = oldweights + log(pyk) + log(pck);
+            ck(i,s) = oldck(i)+y;    % normalized score location given test
+
+            A = [1 yu; 0 1];    % dynamical system rule
+
+            % Kalman Predict
+            Qk = q*[y^3/3 y^2/2; y^2/2 y]; % innovation noise covariance
+            Pk(:, :,i,s) = A*oldPk(:, :, i)*A' + Qk;
+            Wk = H*Pk(:, :,i,s)*H'+Rk; % residual (innovation) covariance
+            xk(:, :, i,s) = A*oldxk(:, :, i); % predicted onset/tempo
+
+            % p(yk|y1:k-1,c1:k):
+            pyk = normpdf(yk, H*xk(:,:,i,s), Wk)+eps;
+
+            % Kalman Update
+            residualError = yk - H*xk(:, :,i,s);
+            Kk = Pk(:, :,i,s)*H'*(Wk)^(-1); % optimal Kalman gain
+            xk(:, :,i,s) = xk(:, :,i,s) + Kk*residualError;
+            Pk(:, :,i,s) = (I-Kk*H)*Pk(:, :,i,s);
+
+            % prior of ck given ck-1
+            [n, d] = numden(sym(ck(i,s))-sym(floor(ck(i,s))));
+            pck = double(exp(-lambda*log2(abs(d))));
+
+            ck(i,s) = oldck(i) + yu; % denormalize the score location
+
+            weights(i,s) = oldweights(i) + log(pyk) + log(pck);
+        end
     end
-    
-    [val idx] = max(weights);
+        
+    %[val idx] = max(weights);
     
     % todo: sample instead of maximize? theoretically better?
-    oldPk = Pk(1:end,1:end,idx);
-    oldxk = xk(1:end,1:end,idx);
-    oldck = ck(idx);
+    %oldPk = Pk(1:end,1:end,idx);
+    %oldxk = xk(1:end,1:end,idx);
+    %oldck = ck(idx);
     
-    oldweights = weights(idx);
+    %oldweights = weights(idx);
     
-    score(k) = ck(idx)
-    xklog = [xklog [oldxk]];
+    %score(k) = ck(idx)
+    %xklog = [xklog [oldxk]];
+    
+    %
+    % pick N best particles
+    %
+    
+    % get indices of N largest weights
+    [t,indices] = sort(weights(:));
+    [R,C] = ind2sub(size(weights),indices);
+    R = flipud(R);
+    C = flipud(C);
+    
+    for i = 1:N
+        % todo: sample instead of maximize? theoretically better?
+        oldPk(:, :, i) = Pk(:, :, R(i), C(i));
+        oldxk(:, :, i) = xk(:, :, R(i), C(i));
+        oldck(i) = ck(R(i), C(i));
+        oldweights(i) = weights(R(i),C(i));
+    end
+    
+    %
+    % pick N best particles spawned from same parent as best particle
+    %
+    %[~, idx] = max(weights)
+    %[~, c] = max(max(weights))
+    %R = idx(c)
+    
+    % get indices of N largest weights associated w/ best particle
+    %[~,C] = sort(weights(R,:),'descend')
+    %for i = 1:N
+    %     oldPk(1:end, 1:end, i) = Pk(1:end, 1:end, R, C(i));
+    %     oldxk(1:end, 1:end, i) = xk(1:end,1:end, R, C(i));
+    %     oldck(i) = ck(R, C(i));
+    %     oldweights(i) = weights(R,C(i));
+    %end
+    
+    score(k) = oldck(1)
+    xklog = [xklog oldxk(1:end, 1:end, 1)];
     
     % if onset is assigned to a beat
     % and haven't already assigned an onset to this beat
