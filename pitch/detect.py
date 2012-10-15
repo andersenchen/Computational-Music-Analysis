@@ -31,6 +31,7 @@ p.add_argument('file', type=str)
 p.add_argument('how', type=pitch_detection_algorithm,
                nargs='?', default='nmf',
                help='nmf | pinv | gd')
+
 args = p.parse_args()
 file = args.file
 how  = args.how
@@ -69,13 +70,19 @@ def pitch_pinv():
     print 'B', B.shape
     X = dot( B, Ai )
     
-    return X
+    return t(X)
+
+
+# gradient descent solution (ie with additive update)
+def pitch_gd():
+    print
+    print 'GD...'
 
 
 # nmf solution (ie with multiplicative update)
 # solve Ax=b for x
 #  where x : nonnegative
-def pitch_nmf():
+def pitch_nmf(iters=50):
     d, _ = classifier.shape
     A = t(classifier)               #eg 1024, 8
     X = 0.5 * ones((d, nWindows))   #eg 8, 60
@@ -103,18 +110,13 @@ def pitch_nmf():
     
     # jointly solve Ax=b forall samples
     # multiplicative update with euclidean distance
-    for k in xrange(20): # until convergence
+    for k in xrange(iters): # until convergence
         numer = dot( t(A), B )    #: 8,1024 * 1024,60
         denom = mul( t(A), A, X ) #: 8,1024 * 1024,8 * 8,60
         X = X * numer / denom
-            
-    return t(X)
+        
+    return X
 
-
-# gradient descent solution (ie with additive update)
-def pitch_gd():
-    print
-    print 'GD...'
 
 def pitch(how='nmf'):
     try:
@@ -128,22 +130,18 @@ def pitch(how='nmf'):
 
 def threshold(x):
     eps = 0.0001
-    x = eps + (x-x.min())/(x.max()-x.min()) # make positive for logarithm
-    x=log(x)
+    x = (x-x.min())/(x.max()-x.min())
     # NOTE wtf!?
     #  i ran this code three times within several seconds, it gave 3 diff plots, only the 3rd looked like the run a few minutes ago.
     x = (x-x.min())/(x.max()-x.min()) # normalize to 0 min
-    top_percent = 25 # threshold at brightest top_percentage%
+    top_percent = 5 # threshold at brightest top_percentage%
     top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1] # sort desc
     dullest = x < top_percentile
     x[dullest] = 0
 
     return x
 
-
-#Main
-x = pitch(how)
-#x = threshold(x)
+# Bug#636364: ipython
 
 #Plot
 # x-axis = time in seconds
@@ -152,47 +150,56 @@ x = pitch(how)
 # y-axis = pitch as note (frequency in Hz)
 #  i => freqs[i]
 
-if __name__=='__main__':
-    ion()
-    import time
-
-    nWindows, d = x.shape
+def _2D(x):
+    d, n_windows = x.shape
 
     window_rate = 2 * sample_rate / window_size # windows per second
 
     axes = gca()
-    axes.imshow(t(x), cmap=cm.jet, origin='lower', aspect='auto', interpolation='nearest')
+    axes.imshow(x,
+                cmap=cm.jet, origin='lower', aspect='auto', interpolation='nearest')
 
     axes.set_title('Transcription')
     axes.get_xaxis().set_major_locator(
-        LinearLocator(1 + ceil(nWindows/window_rate)))
+        LinearLocator(1 + ceil(n_windows/window_rate)))
     axes.get_xaxis().set_major_formatter(
         FuncFormatter(lambda x,y: '%ds' % round(x/window_rate)))
-
+    
     axes.get_yaxis().set_major_locator(
                 LinearLocator(2*d+1))
     axes.get_yaxis().set_major_formatter(
-        FuncFormatter(lambda x,y: '%s' % (freqs[(y-1)//2][0] if odd(y) else '')))# if y>0 and y<d else ''))
+        FuncFormatter(lambda x,y: '%s' % (freqs[(y-1)//2][0] if odd(y) else '')))
 
     draw()
-    time.sleep(60)
+
+def _3D(Z):
+    #figure().gca(projection='3d')
     
-    #show()
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = figure()
+    ax = fig.gca(projection='3d')
+    times, freqs = Z.shape
+    X = a(r(1,times))
+    Y = a(r(1,freqs))
+    X, Y = meshgrid(X, Y)
+    print X.shape
+    print Y.shape
+    print Z.shape
+    surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.jet,
+                           linewidth=0, antialiased=False)
+    draw()
 
+if __name__=='__main__':
+    
+    x = pitch(how)
+    x = threshold(x)
 
-"""
-from mpl_toolkits.mplot3d import Axes3D
-fig = figure()
-ax = fig.gca(projection='3d')
-times, freqs = x.shape
-X = a(r(1,times))
-Y = a(r(1,freqs))
-X, Y = meshgrid(X, Y)
-Z = x
-print X.shape
-print Y.shape
-print Z.shape
-surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.jet,
-        linewidth=0, antialiased=False)
-show()
-"""
+    if True:
+        ion()
+        import time
+
+    _2D(x)
+    time.sleep(60)
+
+    if not True:
+        show()
