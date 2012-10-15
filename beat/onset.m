@@ -2,10 +2,9 @@ clear all;
 
 %% Load audio file
 
-[y, Fs] = wavread('fugue.wav',44100*30);
+[y, Fs] = wavread('king.wav',44100*30);
 
 % only get first channel (two if stereo)
-% only get first 15 secs (current onset computation is slow)
 channel = y(1:end,1);
 
 %% Time plot

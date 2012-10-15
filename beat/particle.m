@@ -1,3 +1,15 @@
+clear all;
+
+%% Load audio/get onsets
+
+% Load audio file
+
+[y, Fs] = wavread('king.wav',44100*30);
+
+% only get first channel (two if stereo)
+channel = y(1:end,1);
+processed = fonset(channel, Fs);
+
 %% Initialize
 
 % score positions
@@ -14,7 +26,6 @@ Rk = 44100*.05;   % this is the noise covariance parameter
             
 lambda = 1; % particle filter score positions prior parameter
             
-
 % constants
 H = [1 0];
 I = eye(2);
@@ -46,6 +57,7 @@ xklog = oldxk;
 
 % old score position
 %oldck = sym(0);
+%oldck = sym(1/2);
 oldck = sym(3/4 - 1/3); % first onset is a pickup
 
 % tallied score positions
