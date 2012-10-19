@@ -15,9 +15,12 @@ from numpy.fft import fft
 from numpy.linalg import pinv
 from matplotlib.pyplot import *
 import argparse
+from scipy.io import wavfile
 
 from sam import *
 
+OUT_DIR = 'out'
+IMAGE_DIR = 'images'
 
 # enum
 pitch_detection_algorithms = ['nmf','pinv', 'gd']
@@ -39,7 +42,7 @@ how  = args.how
 # train classifier
 piano = [glob('train/piano/*.wav')]
 cello = [glob('train/cello/*.wav')]
-dataset = piano + cello
+dataset = piano# + cello
 # classifier :: |notes| by window_size
 classifier, freqs = train_joint(dataset)
 
@@ -63,6 +66,7 @@ def pitch_pinv():
     B  = spectrum / sum(spectrum)
     X  = zeros((nWindows, classifier.shape[0]))
     
+    print
     print 'PINV...'
     print 'A', A.shape
     print 'Ai', Ai.shape
@@ -70,52 +74,73 @@ def pitch_pinv():
     print 'B', B.shape
     X = dot( B, Ai )
     
-    return t(X)
+    return t(X), Ai
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd():
+def pitch_gd(iters=100, stepsize=100):
+    d, sr = classifier.shape
+    A = t(classifier)
+    X = (1/d) * ones((d, nWindows))
+    B = t(spectrum / sum(spectrum))
+
+    X = X[:,:-1]
+    B = B[:,:-1]
+    
     print
     print 'GD...'
-
+    for _ in xrange(iters):
+        # additive update
+        AX = mul(A,X)
+        update = mul( t(A), AX-B )
+        X = X - stepsize*update
+        
+        # project onto nonnegative
+        # |nonnegative R^d| / |R^d| = (1/2)^d  ->  nonnegative space is sparse!
+        X[X<0] = 0
+        
+        # dynamic stepsize
+        stepsize = stepsize * 0.9
+        
+    return X,A
 
 # nmf solution (ie with multiplicative update)
 # solve Ax=b for x
 #  where x : nonnegative
 def pitch_nmf(iters=50):
-    d, _ = classifier.shape
-    A = t(classifier)               #eg 1024, 8
-    X = 0.5 * ones((d, nWindows))   #eg 8, 60
-    B = t(spectrum / sum(spectrum)) #eg 1024, 60
+    d, sr = classifier.shape
+    A = t(classifier)
+    X = (1/d) * ones((d, nWindows))
+    B = t(spectrum / sum(spectrum))
 
     # ignore last sample
     X = X[:,:-1]
     B = B[:,:-1]
-    
-    """
-    print 'NMF...'
-    print 'd', d
-    print 'sr', classifier.shape[1]
-    print 'nW', nWindows
-    print 'us', spectrum.shape
-    print 'A', A.shape
-    print 'b', spectrum[0,:].shape
-    print 'x', X.shape
+
     print
-    """
     print 'NMF...'
-    print 'A', A.shape
-    print 'X', X.shape
-    print 'B', B.shape
+    print '|notes|', d          #eg 8
+    print 'sample rate', sr     #eg 4096
+    print '|windows|', nWindows #eg 119
+    print 'A', A.shape #eg 4096, 8
+    print 'X', X.shape #eg 8, 119
+    print 'B', B.shape #eg 4096, 119
     
     # jointly solve Ax=b forall samples
     # multiplicative update with euclidean distance
-    for k in xrange(iters): # until convergence
-        numer = dot( t(A), B )    #: 8,1024 * 1024,60
-        denom = mul( t(A), A, X ) #: 8,1024 * 1024,8 * 8,60
-        X = X * numer / denom
+    for _ in xrange(iters): # until convergence
+
+        numerX = mul( t(A), B )    #: 8,1024 * 1024,60
+        denomX = mul( t(A), A, X ) #: 8,1024 * 1024,8 * 8,60
+        _X = X * numerX / denomX   #: 8,60
         
-    return X
+        #numerA = mul( B, t(X) )    #: 1024,60 * 60,8
+        #denomA = mul( A, X, t(X) ) #: 1024,8 * 8,60 * 60,8
+        #A = A * numerA / denomA    #: 1024,8
+
+        X = _X
+        
+    return X, A
 
 
 def pitch(how='nmf'):
@@ -134,11 +159,11 @@ def threshold(x):
     # NOTE wtf!?
     #  i ran this code three times within several seconds, it gave 3 diff plots, only the 3rd looked like the run a few minutes ago.
     x = (x-x.min())/(x.max()-x.min()) # normalize to 0 min
-    top_percent = 5 # threshold at brightest top_percentage%
+    top_percent = 10 # threshold at brightest top_percentage%
     top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1] # sort desc
     dullest = x < top_percentile
     x[dullest] = 0
-
+    
     return x
 
 # Bug#636364: ipython
@@ -150,7 +175,7 @@ def threshold(x):
 # y-axis = pitch as note (frequency in Hz)
 #  i => freqs[i]
 
-def _2D(x):
+def d2(x):
     d, n_windows = x.shape
 
     window_rate = 2 * sample_rate / window_size # windows per second
@@ -169,36 +194,48 @@ def _2D(x):
                 LinearLocator(2*d+1))
     axes.get_yaxis().set_major_formatter(
         FuncFormatter(lambda x,y: '%s' % (freqs[(y-1)//2][0] if odd(y) else '')))
-
+    
     draw()
 
-def _3D(Z):
-    #figure().gca(projection='3d')
-    
-    from mpl_toolkits.mplot3d import Axes3D
-    fig = figure()
-    ax = fig.gca(projection='3d')
-    times, freqs = Z.shape
+def d3(Z):
     X = a(r(1,times))
     Y = a(r(1,freqs))
     X, Y = meshgrid(X, Y)
     print X.shape
     print Y.shape
     print Z.shape
+
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = figure()
+    ax = fig.gca(projection='3d')
+    times, freqs = Z.shape
     surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.jet,
                            linewidth=0, antialiased=False)
     draw()
 
 if __name__=='__main__':
     
-    x = pitch(how)
-    x = threshold(x)
-
+    x,a = pitch(how)
+    #x = threshold(x)
+    
     if True:
         ion()
         import time
 
-    _2D(x)
+    """
+    for i in xrange(8):
+        chord = ifft(a[:,i])
+        plot(chord)
+        draw()
+        #wavfile.write('%s/chord.%d.wav' % (OUT_DIR, i), sample_rate, chord)
+        """
+    d2(x)
+
+    image = False
+    if image:
+        image = 'joint, gd, chord'
+        savefig( '%s/%s.png' % (IMAGE_DIR, image), bbox_inches=0 )
+
     time.sleep(60)
 
     if not True:

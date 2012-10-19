@@ -24,7 +24,7 @@ def process_wav(file):
     |frequencies| = window_size
     num_windows / 2 * |frequencies| ~ |seconds| * sample_rate
     """ 
-    print 'processing %s' % file
+    print 'processing %s...' % file
 
     sample_rate, audio = wavfile.read(file)
     #  audio :: |samples| by |channels|
