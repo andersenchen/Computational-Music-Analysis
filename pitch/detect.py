@@ -21,28 +21,42 @@ from sam import *
 
 OUT_DIR = 'out'
 IMAGE_DIR = 'images'
+save = False
 
-# enum
-pitch_detection_algorithms = ['nmf','pinv', 'gd']
-def pitch_detection_algorithm(s):
+pitch_detection_algorithms = ['nmf','pinv', 'gd'] # enum
+def is_pitch_detection_algorithm(s):
     if s in pitch_detection_algorithms: return s
     else: raise ValueError()
+
+datasets = ['all','piano','cello'] # enum
+def is_dataset(s):
+    if s in datasets: return s
+    else: raise ValueError()    
 
 # cli
 p=argparse.ArgumentParser(description="Pitch Detection")
 p.add_argument('file', type=str)
-p.add_argument('how', type=pitch_detection_algorithm,
-               nargs='?', default='nmf',
+p.add_argument('-how', type=is_pitch_detection_algorithm,
+               default='nmf',
                help='nmf | pinv | gd')
+p.add_argument('-data', type=is_dataset,
+               default='all',
+               help='piano | cello | all')
 
 args = p.parse_args()
 file = args.file
 how  = args.how
+data = args.data
 
 # train classifier
 piano = [glob('train/piano/*.wav')]
 cello = [glob('train/cello/*.wav')]
-dataset = piano# + cello
+everything = piano + cello
+dataset = {'all' : everything,
+           'piano' : piano,
+           'cello' : cello,
+           }[data]
+
 # classifier :: |notes| by window_size
 classifier, freqs = train_joint(dataset)
 
@@ -78,7 +92,7 @@ def pitch_pinv():
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(iters=1000, stepsize=100, eps=1e-12):
+def pitch_gd(iters=100, stepsize=100, eps=1e-9):
     d, sr = classifier.shape
     A = t(classifier)
     X = (1/d) * ones((d, nWindows))
@@ -183,7 +197,7 @@ def threshold(x):
 # y-axis = pitch as note (frequency in Hz)
 #  i => freqs[i]
 
-def d2(x):
+def d2(x, title=how):
     d, n_windows = x.shape
 
     window_rate = 2 * sample_rate / window_size # windows per second
@@ -192,7 +206,7 @@ def d2(x):
     axes.imshow(x,
                 cmap=cm.jet, origin='lower', aspect='auto', interpolation='nearest')
 
-    axes.set_title('Transcription')
+    axes.set_title('Transcription, %s' % title)
     axes.get_xaxis().set_major_locator(
         LinearLocator(1 + ceil(n_windows/window_rate)))
     axes.get_xaxis().set_major_formatter(
@@ -223,9 +237,6 @@ def d3(Z):
 
 if __name__=='__main__':
     
-    x,a = pitch(how)
-    #x = threshold(x)
-    
     if True:
         ion()
         import time
@@ -237,10 +248,12 @@ if __name__=='__main__':
         draw()
         #wavfile.write('%s/chord.%d.wav' % (OUT_DIR, i), sample_rate, chord)
         """
-    d2(x)
 
-    image = True
-    if image:
+    x,a = pitch(how)
+    #x = threshold(x)
+    d2(x,how)
+
+    if save:
         image = 'joint, gd, chord'
         savefig( '%s/%s.png' % (IMAGE_DIR, image), bbox_inches=0 )
 
