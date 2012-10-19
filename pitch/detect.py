@@ -78,7 +78,7 @@ def pitch_pinv():
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(iters=100, stepsize=100):
+def pitch_gd(iters=1000, stepsize=100, eps=1e-12):
     d, sr = classifier.shape
     A = t(classifier)
     X = (1/d) * ones((d, nWindows))
@@ -93,15 +93,23 @@ def pitch_gd(iters=100, stepsize=100):
         # additive update
         AX = mul(A,X)
         update = mul( t(A), AX-B )
-        X = X - stepsize*update
-        
+        _X = X - stepsize*update
+
+        # convergence
+        diff = abs(sum(_X - X))
+        if diff < eps:
+            return X,A
+
+        X = _X
+
         # project onto nonnegative
         # |nonnegative R^d| / |R^d| = (1/2)^d  ->  nonnegative space is sparse!
         X[X<0] = 0
         
         # dynamic stepsize
         stepsize = stepsize * 0.9
-        
+
+    print diff
     return X,A
 
 # nmf solution (ie with multiplicative update)
@@ -231,7 +239,7 @@ if __name__=='__main__':
         """
     d2(x)
 
-    image = False
+    image = True
     if image:
         image = 'joint, gd, chord'
         savefig( '%s/%s.png' % (IMAGE_DIR, image), bbox_inches=0 )
