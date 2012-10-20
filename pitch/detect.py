@@ -19,6 +19,9 @@ from scipy.io import wavfile
 
 from sam import *
 
+ROW = 0
+COL = 1
+
 OUT_DIR = 'out'
 IMAGE_DIR = 'images'
 save = False
@@ -92,33 +95,45 @@ def pitch_pinv():
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(iters=100, stepsize=100, eps=1e-9):
+def pitch_gd(iters=1000, stepsize=100, delta=1e-12, eps=0.001):
     d, sr = classifier.shape
     A = t(classifier)
     X = (1/d) * ones((d, nWindows))
     B = t(spectrum / sum(spectrum))
-
+    
     X = X[:,:-1]
     B = B[:,:-1]
     
     print
     print 'GD...'
     for _ in xrange(iters):
+        #for t in xrange(nWindows):
         # additive update
-        AX = mul(A,X)
-        update = mul( t(A), AX-B )
+        # d/dx  ||Ax - b||^2 + sum log x
+        #  =  A.T||Ax - b|| + sum 1/x
+        likelihood = mul( 2 * t(A), mul(A,X) - B )
+        X[X < eps] = eps
+        sparsity   = 1 / X
+        update     = likelihood + sparsity
         _X = X - stepsize*update
-
+        
         # convergence
         diff = abs(sum(_X - X))
-        if diff < eps:
+        if diff < delta:
             return X,A
 
         X = _X
 
         # project onto nonnegative
+        # X >= 0
         # |nonnegative R^d| / |R^d| = (1/2)^d  ->  nonnegative space is sparse!
         X[X<0] = 0
+
+        # project onto unit simplex = dirichlet support
+        # sum(X) over notes == 1
+        normalizer = sum(X, axis=ROW)
+        normalizer[normalizer < eps] = eps
+        X = X / normalizer
         
         # dynamic stepsize
         stepsize = stepsize * 0.9
