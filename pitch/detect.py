@@ -31,7 +31,7 @@ def is_pitch_detection_algorithm(s):
     if s in pitch_detection_algorithms: return s
     else: raise ValueError()
 
-datasets = ['all','piano','cello'] # enum
+datasets = ['all', 'octave', 'piano','cello'] # enum
 def is_dataset(s):
     if s in datasets: return s
     else: raise ValueError()    
@@ -43,8 +43,8 @@ p.add_argument('-how', type=is_pitch_detection_algorithm,
                default='nmf',
                help='nmf | pinv | gd')
 p.add_argument('-data', type=is_dataset,
-               default='all',
-               help='piano | cello | all')
+               default='octave',
+               help='octave | piano | cello | all')
 
 args = p.parse_args()
 file = args.file
@@ -52,11 +52,13 @@ how  = args.how
 data = args.data
 
 # train classifier
-piano = [glob('train/piano/*.wav')]
-cello = [glob('train/cello/*.wav')]
-everything = piano + cello
+piano  = [glob('train/piano/*.wav')]
+octave = [glob('train/octave/*.wav')]
+cello  = [glob('train/cello/*.wav')]
+everything = octave + cello
 dataset = {'all' : everything,
            'piano' : piano,
+           'octave' : octave,
            'cello' : cello,
            }[data]
 
@@ -95,50 +97,49 @@ def pitch_pinv():
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(iters=1000, stepsize=100, delta=1e-12, eps=0.001):
+def pitch_gd(iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=2):
     d, sr = classifier.shape
     A = t(classifier)
     X = (1/d) * ones((d, nWindows))
     B = t(spectrum / sum(spectrum))
     
-    X = X[:,:-1]
-    B = B[:,:-1]
+    X, B = X[:,:-1], B[:,:-1]
     
     print
     print 'GD...'
     for _ in xrange(iters):
         #for t in xrange(nWindows):
         # additive update
-        # d/dx  ||Ax - b||^2 + sum log x
-        #  =  A.T||Ax - b|| + sum 1/x
+        # d/dx    ||Ax - b||^2 + sum log x
+        #  =  2A^T||Ax - b||   + sum 1/x
         likelihood = mul( 2 * t(A), mul(A,X) - B )
-        X[X < eps] = eps
         sparsity   = 1 / X
-        update     = likelihood + sparsity
+        update     = likelihood + alpha * sparsity
         _X = X - stepsize*update
         
         # convergence
         diff = abs(sum(_X - X))
-        if diff < delta:
-            return X,A
-
+        #if diff < eps: return X,A
+        
         X = _X
-
-        # project onto nonnegative
-        # X >= 0
-        # |nonnegative R^d| / |R^d| = (1/2)^d  ->  nonnegative space is sparse!
-        X[X<0] = 0
-
+        
+        # project onto feasible subspace
+        # project onto nonnegative subspace
+        #  X >= 0
+        #  |nonnegative R^d| / |R^d| = (1/2)^d  ->  nonnegative space is sparse!
+        X[X<delta] = delta
         # project onto unit simplex = dirichlet support
-        # sum(X) over notes == 1
-        normalizer = sum(X, axis=ROW)
-        normalizer[normalizer < eps] = eps
+        #  sum X over notes (not time) == 1
+        normalizer = sum(X, axis=ROW) # collapse rows i.e. (m,n) => (1,n)
+#        print normalizer[[0,nWindows//2,-1]]
         X = X / normalizer
+        print X[:,nWindows//2]
         
         # dynamic stepsize
         stepsize = stepsize * 0.9
-
-    print diff
+        
+    print 'diff:',diff
+    #print normalizer[:]
     return X,A
 
 # nmf solution (ie with multiplicative update)
@@ -196,7 +197,7 @@ def threshold(x):
     # NOTE wtf!?
     #  i ran this code three times within several seconds, it gave 3 diff plots, only the 3rd looked like the run a few minutes ago.
     x = (x-x.min())/(x.max()-x.min()) # normalize to 0 min
-    top_percent = 10 # threshold at brightest top_percentage%
+    top_percent = 10 # cutoff at brightest top_percentage%
     top_percentile = sorted(flatten(x.tolist()), reverse=True)[int(x.size*top_percent/100)-1] # sort desc
     dullest = x < top_percentile
     x[dullest] = 0
@@ -220,7 +221,7 @@ def d2(x, title=how):
     axes = gca()
     axes.imshow(x,
                 cmap=cm.jet, origin='lower', aspect='auto', interpolation='nearest')
-
+    
     axes.set_title('Transcription, %s' % title)
     axes.get_xaxis().set_major_locator(
         LinearLocator(1 + ceil(n_windows/window_rate)))
@@ -251,8 +252,9 @@ def d3(Z):
     draw()
 
 if __name__=='__main__':
-    
-    if True:
+    i = 1
+
+    if i:
         ion()
         import time
 
@@ -272,7 +274,8 @@ if __name__=='__main__':
         image = 'joint, gd, chord'
         savefig( '%s/%s.png' % (IMAGE_DIR, image), bbox_inches=0 )
 
-    time.sleep(60)
-
-    if not True:
+    if not i:
         show()
+
+    if i:
+        time.sleep(600)

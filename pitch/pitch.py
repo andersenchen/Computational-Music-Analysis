@@ -52,7 +52,11 @@ def process_wav(file):
     return spectrum, sample_rate
 
 
-def to_freq(file): return int(basename(file)[1:])
+def to_freq(file):
+    file = basename(file)
+    if file[0].isalpha():
+        file = file[1:]
+    return int(file)
 
 def train_joint(dataset):
     print
