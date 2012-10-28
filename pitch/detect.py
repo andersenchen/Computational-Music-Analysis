@@ -97,7 +97,7 @@ def pitch_pinv():
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=2):
+def pitch_gd(iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-10):
     d, sr = classifier.shape
     A = t(classifier)
     X = (1/d) * ones((d, nWindows))
@@ -117,26 +117,24 @@ def pitch_gd(iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=2):
         update     = likelihood + alpha * sparsity
         _X = X - stepsize*update
         
-        # convergence
-        diff = abs(sum(_X - X))
-        #if diff < eps: return X,A
-        
-        X = _X
-        
         # project onto feasible subspace
         # project onto nonnegative subspace
         #  X >= 0
         #  |nonnegative R^d| / |R^d| = (1/2)^d  ->  nonnegative space is sparse!
-        X[X<delta] = delta
+        _X[_X < delta] = delta
         # project onto unit simplex = dirichlet support
         #  sum X over notes (not time) == 1
-        normalizer = sum(X, axis=ROW) # collapse rows i.e. (m,n) => (1,n)
-#        print normalizer[[0,nWindows//2,-1]]
-        X = X / normalizer
-        print X[:,nWindows//2]
+        #normalizer = sum(X, axis=ROW) # collapse rows i.e. (m,n) => (1,n)
+        #_X = _X / normalizer
         
         # dynamic stepsize
         stepsize = stepsize * 0.9
+
+        # convergence
+        diff = abs(sum(_X - X))
+        #if diff < eps: return X,A
+
+        X = _X
         
     print 'diff:',diff
     #print normalizer[:]
