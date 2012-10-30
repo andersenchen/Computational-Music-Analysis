@@ -99,11 +99,12 @@ def pitch_pinv(classifier, spectrum):
     print 'B', B.shape
     X = dot( B, Ai )
     
+    params = {}
     return t(X), Ai
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(classifier, spectrum, iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-10):
+def pitch_gd(classifier, spectrum, iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-2):
     d, sr = classifier.shape
     A = t(classifier.copy())
     X = (1/d) * ones((d, nWindows))
@@ -156,7 +157,14 @@ def pitch_gd(classifier, spectrum, iters=100, stepsize=100, eps=1e-12, delta=1e-
         
     print 'diff:',diff
     #print normalizer[:]
-    return X,A
+    params = {'iters':iters,
+              'stepsize':stepsize,
+              'alpha':alpha,
+              'eps':eps,
+              'delta':delta
+              }
+              
+    return X, A, params
 
 # nmf solution (ie with multiplicative update)
 # solve Ax=b for x
@@ -193,8 +201,11 @@ def pitch_nmf(classifier, spectrum, iters=50):
         #A = A * numerA / denomA    #: 1024,8
 
         X = _X
-        
-    return X, A
+
+    params = {'iters':iters,
+              }
+
+    return X, A, params
 
 
 def pitch(classifier, spectrum, how='nmf'):
@@ -282,7 +293,7 @@ if __name__=='__main__':
         #wavfile.write('%s/chord.%d.wav' % (OUT_DIR, i), sample_rate, chord)
         """
 
-    x,a = pitch(classifier, spectrum, how=how)
+    x,a,params = pitch(classifier, spectrum, how=how)
     #x = threshold(x)
     d2(x, freqs, sample_rate, window_size, title=how)
 
