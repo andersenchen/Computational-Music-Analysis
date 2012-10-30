@@ -105,22 +105,34 @@ def pitch_pinv(classifier, spectrum):
 # gradient descent solution (ie with additive update)
 def pitch_gd(classifier, spectrum, iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-10):
     d, sr = classifier.shape
-    A = t(classifier)
+    A = t(classifier.copy())
     X = (1/d) * ones((d, nWindows))
-    B = t(spectrum / sum(spectrum))
+    B = t(spectrum.copy() / sum(spectrum))
     
     X, B = X[:,:-1], B[:,:-1]
-    
+    stickiness = zeros(X.shape)
+
     print
     print 'GD...'
     for _ in xrange(iters):
-        #for t in xrange(nWindows):
-        # additive update
+        
         # d/dx    ||Ax - b||^2 + sum log x
         #  =  2A^T||Ax - b||   + sum 1/x
         likelihood = mul( 2 * t(A), mul(A,X) - B )
-        sparsity   = 1 / X
-        update     = likelihood + alpha * sparsity
+        
+        # wolfram alpha  d/dx -log( (2*e^(-(x-y)^2)) / (1+e^(-(x-y)^2)) )
+        #  where x = x[i][t] . y = x[i][t-1]
+        # curr_minus_prev[t][i] = X[i][t] - X[i][t-1] 
+        curr_minus_prev = X[:,:-1] - X[:,1:]
+        stickiness_numer = 2 * curr_minus_prev * exp(curr_minus_prev**2)
+        stickiness_denom = 1 + exp(curr_minus_prev**2)
+        # P( x[0] ) = uniform
+        stickiness[:,0 ] = 1/d
+        # P( x[t] | x[t-1] ) = S( ||x[t] - x[t-1]||^2 )
+        stickiness[:,1:] = stickiness_numer / stickiness_denom
+        
+        # additive update
+        update     = likelihood + alpha * stickiness
         _X = X - stepsize*update
         
         # project onto feasible subspace
