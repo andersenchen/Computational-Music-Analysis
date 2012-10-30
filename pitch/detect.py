@@ -36,31 +36,37 @@ def is_dataset(s):
     if s in datasets: return s
     else: raise ValueError()    
 
-# cli
-p=argparse.ArgumentParser(description="Pitch Detection")
-p.add_argument('file', type=str)
-p.add_argument('-how', type=is_pitch_detection_algorithm,
-               default='nmf',
-               help='nmf | pinv | gd')
-p.add_argument('-data', type=is_dataset,
-               default='octave',
-               help='octave | piano | cello | all')
+if __name__=='__main__':
+    # cli
+    p=argparse.ArgumentParser(description="Pitch Detection")
+    p.add_argument('file', type=str)
+    p.add_argument('-how', type=is_pitch_detection_algorithm,
+                   default='nmf',
+                   help='nmf | pinv | gd')
+    p.add_argument('-data', type=is_dataset,
+                   default='octave',
+                   help='octave | piano | cello | all')
+    p.add_argument('-ioff', action='store_true', dest='ioff', help='ioff = interact with plot (ion = interact with program)')
 
-args = p.parse_args()
-file = args.file
-how  = args.how
-data = args.data
+    args = p.parse_args()
+    file = args.file
+    how  = args.how
+    data = args.data
 
-# train classifier
-piano  = [glob('train/piano/*.wav')]
-octave = [glob('train/octave/*.wav')]
-cello  = [glob('train/cello/*.wav')]
-everything = octave + cello
-dataset = {'all' : everything,
-           'piano' : piano,
-           'octave' : octave,
-           'cello' : cello,
-           }[data]
+    # train classifier
+    piano  = [glob('train/piano/*.wav')]
+    octave = [glob('train/octave/*.wav')]
+    cello  = [glob('train/cello/*.wav')]
+    everything = octave + cello
+    dataset = {'all' : everything,
+               'piano' : piano,
+               'octave' : octave,
+               'cello' : cello,
+               }[data]
+else:
+    dataset = [glob('train/octave/*.wav')]
+    file = 'chord.wav'
+    how = 'nmf'
 
 # classifier :: |notes| by window_size
 classifier, freqs = train_joint(dataset)
@@ -79,7 +85,7 @@ nWindows = spectrum.shape[0]
 # d = dimensionality of hidden var
 # d' = dimensionality of observed var
 # eg d = 8 = |keys in 1 piano 8ve| . d' = 4096 = |linear bins of audible pitches|
-def pitch_pinv():
+def pitch_pinv(classifier, spectrum):
     A  = classifier
     Ai = pinv(A)
     B  = spectrum / sum(spectrum)
@@ -97,7 +103,7 @@ def pitch_pinv():
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-10):
+def pitch_gd(classifier, spectrum, iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-10):
     d, sr = classifier.shape
     A = t(classifier)
     X = (1/d) * ones((d, nWindows))
@@ -143,7 +149,7 @@ def pitch_gd(iters=100, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-10):
 # nmf solution (ie with multiplicative update)
 # solve Ax=b for x
 #  where x : nonnegative
-def pitch_nmf(iters=50):
+def pitch_nmf(classifier, spectrum, iters=50):
     d, sr = classifier.shape
     A = t(classifier)
     X = (1/d) * ones((d, nWindows))
@@ -179,12 +185,12 @@ def pitch_nmf(iters=50):
     return X, A
 
 
-def pitch(how='nmf'):
+def pitch(classifier, spectrum, how='nmf'):
     try:
         return {'nmf'  : pitch_nmf,
                 'pinv' : pitch_pinv,
                 'gd'   : pitch_gd,
-                }[how]()
+                }[how](classifier, spectrum)
     except KeyError:
         raise ValueError('\n'.join(["pitch()...", " wants how={'nmf'|'pinv'|'gd'}", " got how=%s" % how]))
 
@@ -211,7 +217,7 @@ def threshold(x):
 # y-axis = pitch as note (frequency in Hz)
 #  i => freqs[i]
 
-def d2(x, title=how):
+def d2(x, freqs, sample_rate, window_size, title=how):
     d, n_windows = x.shape
 
     window_rate = 2 * sample_rate / window_size # windows per second
@@ -232,7 +238,7 @@ def d2(x, title=how):
         FuncFormatter(lambda x,y: '%s' % (freqs[(y-1)//2][0] if odd(y) else '')))
     
     draw()
-
+ 
 def d3(Z):
     X = a(r(1,times))
     Y = a(r(1,freqs))
@@ -250,9 +256,9 @@ def d3(Z):
     draw()
 
 if __name__=='__main__':
-    i = 1
+    
 
-    if i:
+    if not args.ioff:
         ion()
         import time
 
@@ -264,16 +270,38 @@ if __name__=='__main__':
         #wavfile.write('%s/chord.%d.wav' % (OUT_DIR, i), sample_rate, chord)
         """
 
-    x,a = pitch(how)
+    x,a = pitch(classifier, spectrum, how=how)
     #x = threshold(x)
-    d2(x,how)
+    d2(x, freqs, sample_rate, window_size, title=how)
 
     if save:
         image = 'joint, gd, chord'
         savefig( '%s/%s.png' % (IMAGE_DIR, image), bbox_inches=0 )
 
-    if not i:
+    if args.ioff:
         show()
 
-    if i:
+    if not args.ioff:
         time.sleep(600)
+
+"""
+
+from compmusic.pitch.detect import *
+
+dataset = [glob('train/piano/*.wav')]
+how = 'nmf'
+file = 'chord.wav'
+
+#sorted([int(f.split('/')[-1].split('.')[0][1:]) for f in dataset])
+A, freqs = train_joint(dataset)
+B, sample_rate = process_wav(file)
+
+_A = zeros(A.shape)
+for i in xrange(A.shape[0]): 
+    in_max = argmax(half(A[i,:]))
+    out_max = max(half(A[i,:]))
+    _A[i, in_max] = out_max
+x,a = pitch_nmf(_A, B)
+d2(x, freqs, sample_rate, window_size, title=how)
+
+"""
