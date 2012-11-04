@@ -32,10 +32,10 @@ for i = 1:nWindows-2
 end
 
 %% NMF BITCH
-[spectra, coeff] = nnmf(spectrum' ,12);%, 'w0', classifier');
+[spectra, coeff] = nnmf(spectrum' ,8);%, 'w0', classifier');
 
 %%
-firstNote = spectra(:, 7);
+firstNote = spectra(:, 8);
 in = ifft(firstNote);
 in = repmat(in, 10, 1);
 player = audioplayer(in, 44100);
@@ -69,18 +69,52 @@ for i = 1:nWindows
     end
 end
 
+%%
+plot(1 - gampdf(1:1:500,2,100)/max(gampdf(1:1:500,2,100)));
+
+%%
+
+x = (1:1:800) / 250;
+mu = 1;
+sigma = .5;
+
+plot(1./((x)*pi*sigma.*(1 + ((log(x) - mu)/sigma).^2)))
+
+%%
+for i = 2:10
+    abs(spectra(i,:) - spectra(i-1,:))
+end
+    
 %% gradient descent solution (additive)
 
-spectra = zeros(nWindows,16);
+spectra = ones(nWindows,16);
 for i = 1:nWindows
     % normalize to unit vector
     u = spectrum(i,:) / sum(spectrum(i,:));
  
     spectra(i,:) = zeros(16,1);
     eps = 50;
+
     for k = 1:100 % until convergence
-        spectra(i,:) = spectra(i,:) + ...
-            eps*(classifier*spectrum(i,:)' - classifier*classifier'*spectra(i,:)')';
+        if (i == 1)
+            spectra(i,:) = spectra(i,:) + ...
+                eps*(classifier*spectrum(i,:)' - classifier*classifier'*spectra(i,:)')';
+        else
+            kgam = 2;
+            theta = 1;
+            
+            % gamma distribution does opposite of what we want
+            %dpxx1 = theta^(-1) - (kgam-1)*(abs(spectra(i,:) - spectra(i-1,:)) + .01).^(-1);
+            
+            % log cauchy distribution
+            x = (abs(spectra(i,:) - spectra(i-1,:)) + 5) / 250;
+            dpxx1 = sigma*(mu^2 - 2*mu + sigma^2 - 2*(mu - 1)*log(x) + (log(x)).^2) ...
+                ./ (pi*(x.^2).*(mu^2 + sigma^2 - 2*mu*log(x) + (log(x)).^2).^2);
+            
+            spectra(i,:) = spectra(i,:) + ...
+                eps*(classifier*spectrum(i,:)' - classifier*classifier'*spectra(i,:)' - dpxx1')';
+        end
+        
 %        spectra(i,:) = spectra(i,:) + ...
 %            eps*(classifier*spectrum(i,:)' - classifier*classifier'*spectra(i,:)' + spectra(i,:)')';
 
@@ -90,15 +124,15 @@ for i = 1:nWindows
                 spectra(i,m) = 0;
             end
         end
-        
+
         % sparsity
-        if k > 50
-            for m = 1:size(spectra,2)
-                if spectra(i,m) < 300
-                    spectra(i,m) = 0;
-                end
-            end
-        end
+        %if k > 50
+        %    for m = 1:size(spectra,2)
+        %        if spectra(i,m) < 300
+        %            spectra(i,m) = 0;
+        %        end
+        %    end
+        %end
 
         if eps > 2
             eps = eps - 1;
@@ -111,7 +145,7 @@ end
 %% Graph output
 
 output = fliplr(spectra); % to print right
-surf([coeff' zeros(nWindows,1)]); % need extra padding for surf (wtf)
+surf([output zeros(nWindows,1)]); % need extra padding for surf (wtf)
 
 %% Generate spectra time lapse
 for i = 1:nWindows
