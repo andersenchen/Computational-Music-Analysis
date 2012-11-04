@@ -7,7 +7,7 @@
 
 from __future__ import division
 
-from compmusic.sambo.sam import *
+from music.sambo.sam import *
 from pitch import *
 
 from numpy import *
@@ -51,9 +51,10 @@ if __name__=='__main__':
                    default='nmf',
                    help='nmf | pinv | gd')
     p.add_argument('-data', type=is_dataset, #nargs='*', #rets list
+                   default='white',
                    help='piano | white | black | cello | all')
     p.add_argument('-ioff', action='store_true', dest='ioff', help='ioff = interact with plot (ion = interact with program)')
-
+     
     args = p.parse_args()
     file = args.file
     how  = args.how

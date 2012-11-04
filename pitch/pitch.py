@@ -1,7 +1,7 @@
 from __future__ import division
 
-from compmusic.sambo.sam import *
-from compmusic.sambo.music import *
+from music.sambo.sam import *
+from music.sambo.music import *
 
 from numpy import *
 from numpy.fft import *
