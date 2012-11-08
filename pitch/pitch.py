@@ -10,7 +10,7 @@ from matplotlib.pyplot import *
 import argparse
 from scipy.io import wavfile
 from glob import *
-
+import re
 
 window_size = 2**12
 hanning_window = hanning(window_size)
@@ -54,9 +54,13 @@ def process_wav(file):
 
 def to_freq(file):
     file = basename(file)
-    if file[0].isalpha():
-        file = file[1:]
-    return int(file)
+    note = re.sub("[^ a-zA-Z #b 0-7]", "", file)
+    frequency = re.sub("[^0-9]", "", file)
+    if note:
+        return freq(note)
+    else:
+        return int(frequency)
+
 
 def train_joint(dataset):
     print

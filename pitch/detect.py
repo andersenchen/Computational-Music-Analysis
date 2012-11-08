@@ -38,7 +38,7 @@ def is_pitch_detection_algorithm(s):
     if s in pitch_detection_algorithms: return s
     else: raise ValueError()
 
-dataset_dirs = ['all', 'white', 'black', 'piano','cello'] # enum
+dataset_dirs = ['all', 'white', 'black', 'piano','cello', 'live'] # enum
 def is_dataset(s):
     if s in dataset_dirs: return s
     else: raise ValueError()    
@@ -54,23 +54,25 @@ if __name__=='__main__':
                    default='white',
                    help='piano | white | black | cello | all')
     p.add_argument('-ioff', action='store_true', dest='ioff', help='ioff = interact with plot (ion = interact with program)')
-     
+    
     args = p.parse_args()
     file = args.file
     how  = args.how
     data = args.data
-
+    
     # train classifier
     piano  = [glob('train/piano/*.wav')]
     white  = [glob('train/white/*.wav')]
     black  = [glob('train/black/*.wav')]
     cello  = [glob('train/cello/*.wav')]
+    live  = [glob('train/live/*.wav')]
     everything = cello + white
     dataset = {'all' : everything,
                'piano' : piano,
                'white' : white,
                'black' : black,
                'cello' : cello,
+               'live' : live,
                }[data]
 
 else:
@@ -322,7 +324,7 @@ if __name__=='__main__':
     spectrum, sample_rate = process_wav(file)
     
     x,a,params = pitch(classifier, spectrum, how=how)
-    x = threshold(x)
+    #x = threshold(x)
 
     title = 'Transcription . %s . %s' % (how, file)
     d2(x, freqs, sample_rate, window_size, title=title)
