@@ -79,15 +79,6 @@ else:
     #how = 'nmf'
     pass
 
-# classifier : |notes| by window_size
-classifier, freqs = train_joint(dataset)
-
-# read file
-spectrum, sample_rate = process_wav(file)
-
-# consts
-nWindows, _ = spectrum.shape
-
 # pseudoinverse solution
 # solve Ax=b for x given A,b
 # x : (d,1) = notes
@@ -97,10 +88,12 @@ nWindows, _ = spectrum.shape
 # d' = dimensionality of observed var
 # eg d = 8 = |keys in 1 piano 8ve| . d' = 4096 = |linear bins of audible pitches|
 def pitch_pinv(classifier, spectrum):
+
+    n, _ = spectrum.shape
     A  = classifier
     Ai = pinv(A)
     B  = spectrum / sum(spectrum)
-    X  = zeros((nWindows, classifier.shape[0]))
+    X  = zeros((n, classifier.shape[0]))
     
     print
     print 'PINV...'
@@ -118,9 +111,11 @@ def pitch_pinv(classifier, spectrum):
 # solve Ax=b for x
 #  where x : nonnegative
 def pitch_nmf(classifier, spectrum, iters=50):
+
+    n, _ = spectrum.shape
     d, window_size = classifier.shape
     A = t(classifier)
-    X = (1/d) * ones((d, nWindows))
+    X = (1/d) * ones((d, n))
     B = t(spectrum / sum(spectrum))
 
     # ignore last sample
@@ -131,7 +126,7 @@ def pitch_nmf(classifier, spectrum, iters=50):
     print 'NMF...'
     print '|notes|', d           #eg 8
     print 'sam/win', window_size #eg 4096
-    print '|windows|', nWindows  #eg 119
+    print '|windows|', n  #eg 119
     print 'A', A.shape #eg 4096, 8
     print 'X', X.shape #eg 8, 119
     print 'B', B.shape #eg 4096, 119
@@ -157,7 +152,7 @@ def pitch_nmf(classifier, spectrum, iters=50):
 
 
 # gradient descent solution (ie with additive update)
-def pitch_gd(classifier, spectrum, iters=50, stepsize=100, eps=1e-12, delta=1e-6, alpha=0):
+def pitch_gd(classifier, spectrum, iters=25, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-2):
     n, _ = spectrum.shape
     d, sr = classifier.shape
     A = t(classifier.copy())
@@ -184,7 +179,7 @@ def pitch_gd(classifier, spectrum, iters=50, stepsize=100, eps=1e-12, delta=1e-6
         #  d/dx -log( (2*e^(-(x-y)^2)) / (1+e^(-(x-y)^2)) )
         time_diff = X[:,1:] - X[:,:-1]
         stats(time_diff)
-        #diff = zeros((d,nWindows+1))
+        #diff = zeros((d,n+1))
         for (i,j) in ndindex((d, n-3)):
             s = j+1
             #  t-1 in 0..n-3
@@ -235,6 +230,7 @@ def pitch_gd(classifier, spectrum, iters=50, stepsize=100, eps=1e-12, delta=1e-6
 
 
 def pitch(classifier, spectrum, how='nmf'):
+
     try:
         return {'nmf'  : pitch_nmf,
                 'pinv' : pitch_pinv,
@@ -319,8 +315,14 @@ if __name__=='__main__':
         #wavfile.write('%s/chord.%d.wav' % (OUT_DIR, i), sample_rate, chord)
         """
 
+    # classifier : |notes| by window_size
+    classifier, freqs = train_joint(dataset)
+
+    # read file
+    spectrum, sample_rate = process_wav(file)
+    
     x,a,params = pitch(classifier, spectrum, how=how)
-    #x = threshold(x)
+    x = threshold(x)
 
     title = 'Transcription . %s . %s' % (how, file)
     d2(x, freqs, sample_rate, window_size, title=title)
