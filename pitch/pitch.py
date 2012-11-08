@@ -16,18 +16,12 @@ window_size = 2**12
 hanning_window = hanning(window_size)
 
 
-def process_wav(file):
-    """ 
-    spectrum, samplerate = process_wav(filename)
-
-    spectrum :: num_windows by window_size
-    |frequencies| = window_size
-    num_windows / 2 * |frequencies| ~ |seconds| * sample_rate
-    """ 
-    print 'processing %s...' % file
-
-    sample_rate, audio = wavfile.read(file)
+def audio_wav(file, truncate=None):
     #  audio :: |samples| by |channels|
+    sample_rate, audio = wavfile.read(file)
+
+    #  keep first channel
+    #  keep first 2^31 samples
     if len(audio.shape)==1:
         nSamples, = audio.shape
         nChannels = 1
@@ -35,31 +29,53 @@ def process_wav(file):
     else:
         nSamples, nChannels = audio.shape
         audio = audio[:int32(nSamples), 0]
-    
-    #  keep first channel
-    #  keep first 2^31 samples
+
+    # consistent times => consistent frequencies
+    if truncate:
+        print 'truncating %s' % file
+        audio = audio[:truncate]
+
+    return audio, sample_rate
+
+def process_wav(file, truncate=None):
+    """ 
+    spectrum :: num_windows by window_size
+    |frequencies| = window_size
+    num_windows / 2 * |frequencies| ~ |seconds| * sample_rate
+    """ 
+    print 'processing %s...' % file
+    audio, sample_rate = audio_wav(file, truncate=truncate)
+
     nWindows = int32(audio.size/window_size *2) # double <- overlap windows
     
     spectrum = zeros((nWindows,window_size))
-    true_spectrum = spectrum.copy()
 
     for i in xrange(0,nWindows-1):
         t = int32(i* window_size/2)
         window = audio[t : t+window_size] * hanning_window # elemwise mult
-        true_spectrum[i,:] = fft(window)
-        spectrum[i,:] = abs(true_spectrum[i,:])
-
+        spectrum[i,:] = abs(fft(window))
+        
     return spectrum, sample_rate
 
 
 def to_freq(file):
     file = basename(file)
+
+    frequency = re.match('[A-G][#b]?(?P<freq>[0-9]+)', file)
+    if frequency:
+        frequency = frequency.groupdict()['freq']
+        return int(frequency)
+
+    frequency = re.match('[0-9]+', file)
+    if frequency:
+        frequency = frequency.group()
+        return int(frequency)
+
     note = re.sub("[^ a-zA-Z #b 0-7]", "", file)
-    frequency = re.sub("[^0-9]", "", file)
     if note:
         return freq(note)
-    else:
-        return int(frequency)
+
+    raise Exception('bad audio filename "%s"' % file)
 
 
 def train_joint(dataset):
@@ -84,8 +100,10 @@ def train_joint(dataset):
     #  keep track of file's pitch
     #  eg 'A440.wav' => 440
     
+    truncate = min( audio_wav(file)[0].shape[0] for i,file in enumerate(flatten(dataset)) )
+
     for i,file in enumerate(flatten(dataset)):
-        spec, _ = process_wav(file)
+        spec, _ = process_wav(file,truncate=truncate)
         
         # normalize to unit vector
         classifier[i,:] = sum(spec,0) / sum(spec)
