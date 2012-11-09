@@ -32,7 +32,8 @@ f4 = cos( 4 * times ) #a([1,-1, 1,-1, 1,-1, 1,-1])
 #signal = f1 + f2 + f3 + f4
 signal = f1 + f2 + f3 + f4
 
-def fft_(signal, samples, sample_rate):
+def fft_(signal, sample_rate):
+    samples = len(signal)
     spectrum = abs(fft(signal))**2 * sample_rate
     freqs    = fftfreq(samples, d=1/sample_rate)
      # normalize signal to |sample_rate| seconds

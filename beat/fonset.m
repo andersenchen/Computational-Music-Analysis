@@ -26,7 +26,7 @@ function [ processed ] = fonset( channel, Fs )
     dw2dt2 = dwdt(1:end,2:end) - dwdt(1:end,1:(end-1));
 
     % Euclidean distance
-    dist = sum((spec(1:end,2:end) - spec(1:end,1:(end-1))).^2)
+    dist = sum((spec(1:end,2:end) - spec(1:end,1:(end-1))).^2);
     
     % Compute onsets (sum)
     
@@ -35,7 +35,6 @@ function [ processed ] = fonset( channel, Fs )
     processed = [];
     lockout = -1;
     for i = 1:size(input,2)
-        i
         onset = 0; % guess no onset
         s = sum(input(:,i));
 
@@ -45,11 +44,10 @@ function [ processed ] = fonset( channel, Fs )
         end
 
         if (onset == 1 && lockout < 0)
-            fprintf('onset\n')
             processed = [processed i*windowSize/2];
 
             % don't let onsets pile up on each other
-            lockout = floor(Fs/(windowSize*4))
+            lockout = floor(Fs/(windowSize*4));
         end
 
         lockout = lockout - 1;
