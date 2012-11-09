@@ -32,8 +32,28 @@ for i = 1:nWindows-2
 end
 
 %% NMF BITCH
-[spectra, coeff] = nnmf(spectrum' ,12);%, 'w0', classifier');
+tic
+spectra = 0;
+coeff = 0;
+argmin = 0;
+min = Inf;
 
+for i = 8
+    
+    i
+    [spectra, coeff] = nmfsc(spectrum' ,i, [], 0.6, 'wat', 0);
+    entropy = sum(sum(spectrum'-(spectra*coeff)).^2)/i*sqrt(i);
+    if entropy < min
+        argmin = i;
+        min = entropy;
+    end
+end
+argmin
+min
+
+
+%, 'w0', classifier');
+toc
 %%
 firstNote = spectra(:, 7);
 in = ifft(firstNote);
