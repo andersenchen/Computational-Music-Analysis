@@ -112,7 +112,7 @@ def pitch_pinv(classifier, spectrum):
 # nmf solution (ie with multiplicative update)
 # solve Ax=b for x
 #  where x : nonnegative
-def pitch_nmf(classifier, spectrum, iters=50):
+def pitch_nmf(classifier, spectrum, iters=25):
 
     n, _ = spectrum.shape
     d, window_size = classifier.shape
@@ -123,6 +123,7 @@ def pitch_nmf(classifier, spectrum, iters=50):
     # ignore last sample
     X = X[:,:-1]
     B = B[:,:-1]
+    n = n-1
 
     print
     print 'NMF...'
@@ -133,19 +134,27 @@ def pitch_nmf(classifier, spectrum, iters=50):
     print 'X', X.shape #eg 8, 119
     print 'B', B.shape #eg 4096, 119
      
-    # jointly solve Ax=b forall samples
+    # jointly solve AX=B forall samples
     # multiplicative update with euclidean distance
     for _ in xrange(iters): # until convergence
 
-        numerX = mul( t(A), B )    #: 8,1024 * 1024,60
-        denomX = mul( t(A), A, X ) #: 8,1024 * 1024,8 * 8,60
-        _X = X * numerX / denomX   #: 8,60
-        
-        #numerA = mul( B, t(X) )    #: 1024,60 * 60,8
-        #denomA = mul( A, X, t(X) ) #: 1024,8 * 8,60 * 60,8
-        #A = A * numerA / denomA    #: 1024,8
+        numerX = mul( t(A), B )    #: 8,1024 * 1024,59
+        denomX = mul( t(A), A, X ) #: 8,1024 * 1024,8 * 8,59
+        X = X * numerX / denomX    #: 8,59
 
-        X = _X
+        # independently solve Ax=b forall samples
+        #for i in xrange(n):
+            #numerX = mul( t(A), B[:,i] )      #: 8,1024 * 1024,1
+            #denomX = mul( t(A), A, X[:,i] )   #: 8,1024 * 1024,8 * 8,1
+            #X[:,i] = X[:,i] * numerX / denomX #: 8,1
+        
+
+        # learn A
+        #numerA = mul( B, t(X) )    #: 1024,59 * 59,8
+        #denomA = mul( A, X, t(X) ) #: 1024,8 * 8,59 * 59,8
+        #A = A * numerA / denomA    #: 1024,8
+        
+        #X = _X
 
     params = {'iters':iters,
               }
