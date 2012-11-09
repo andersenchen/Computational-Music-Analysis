@@ -112,7 +112,7 @@ def pitch_pinv(classifier, spectrum):
 # nmf solution (ie with multiplicative update)
 # solve Ax=b for x
 #  where x : nonnegative
-def pitch_nmf(classifier, spectrum, iters=25):
+def pitch_nmf(classifier, spectrum, iters=100):
 
     n, _ = spectrum.shape
     d, window_size = classifier.shape
@@ -162,8 +162,9 @@ def pitch_nmf(classifier, spectrum, iters=25):
     return X, A, params
 
 
+
 # gradient descent solution (ie with additive update)
-def pitch_gd(classifier, spectrum, iters=25, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-2):
+def pitch_gd(classifier, spectrum, iters=50, stepsize=100, eps=1e-12, delta=1e-6, alpha=1e-10):
     n, _ = spectrum.shape
     d, sr = classifier.shape
     A = t(classifier.copy())
@@ -175,8 +176,8 @@ def pitch_gd(classifier, spectrum, iters=25, stepsize=100, eps=1e-12, delta=1e-6
     
     print
     print 'GD...'
-    for _ in xrange(iters):
-        
+    for iteration in xrange(iters):
+        print iteration+1
         # gaussian distance likelihood
         # P( b | A,x ) = N[Ax,1]( b )
         # d/dx    ||Ax - b||^2 + sum log x
@@ -188,6 +189,8 @@ def pitch_gd(classifier, spectrum, iters=25, stepsize=100, eps=1e-12, delta=1e-6
         #  scaled translated complemented logistic( ||x[t] - x[t-1]||^2 )
         # wolfram alpha
         #  d/dx -log( (2*e^(-(x-y)^2)) / (1+e^(-(x-y)^2)) )
+        #  = (2 (x-y) e^((x-y)^2)) / (1 + e^((x-y)^2)) )
+        #  = (x-y) * (1 + (tanh 1/2 (x-y)^2))
         time_diff = X[:,1:] - X[:,:-1]
         stats(time_diff)
         #diff = zeros((d,n+1))
@@ -197,13 +200,11 @@ def pitch_gd(classifier, spectrum, iters=25, stepsize=100, eps=1e-12, delta=1e-6
             # (j   in 0..n-3)
             #  t   in 1..n-2
             #  t+1 in 2..n-1
-            ab = X[i,s]   - X[i,s-1]
-            bc = X[i,s+1] - X[i,s]
-            numer_ab = 2 * ab * exp(ab**2)
-            denom_ab = 1 + exp(ab**2)
-            numer_bc = 2 * bc * exp(bc**2)
-            denom_bc = 1 + exp(bc**2)
-            prior[i,s] = - (numer_ab / denom_ab) - (numer_bc / denom_bc)
+            pc = X[i,s]   - X[i,s-1]
+            cn = X[i,s+1] - X[i,s]
+            prev_curr = pc * (1 + tanh( 1/2 * pc**2))
+            curr_next = cn * (1 + tanh( 1/2 * cn**2))
+            prior[i,s] = - (prev_curr + curr_next)
             
         # additive update
         update = likelihood + alpha * prior
