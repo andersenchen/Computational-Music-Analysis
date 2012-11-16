@@ -100,7 +100,9 @@ def train_joint(dataset):
     #  keep track of file's pitch
     #  eg 'A440.wav' => 440
     
-    truncate = min( audio_wav(file)[0].shape[0] for i,file in enumerate(flatten(dataset)) )
+    truncate = min( show(audio_wav(file)[0].shape[0]) for i,file in enumerate(flatten(dataset)) )
+    truncate = 44100 * 10 #TODO fixes white data bug
+    print 'truncating at %s samples' % (truncate)
 
     for i,file in enumerate(flatten(dataset)):
         spec, _ = process_wav(file,truncate=truncate)

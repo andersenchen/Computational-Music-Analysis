@@ -27,6 +27,10 @@ def r(x,y): return range(x, y+1)
 import sys
 def p(x): sys.stdout.write(str(x) + ' ')
 
+def show(x):
+    print x
+    return x
+
 def basename(s):
     s = s.split('/')[-1] # rem dirs
     return s[:s.index('.')] # rem ext
