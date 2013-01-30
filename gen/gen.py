@@ -35,8 +35,14 @@ def file2note(s):
     #note, _ = music.note(pitch.to_freq(s))
     return pitch.to_freq(s)
 
-#:: [x] => bool
-def unique(xs): return len(xs) == len(set(xs))
+#:: [x] | (x,) | {x:_} => bool
+def unique(xs, key=lambda x: x):
+    return len(xs) == len(set(key(x) for x in xs))
+
+#:: [x] | (x,) | {x:_} => bool
+def same(xs, key=lambda x: x):
+    y = key(xs[0])
+    return all(y==key(x) for x in xs)
 
 class MusicException(Exception):
     def __init__(self, message):
@@ -44,10 +50,8 @@ class MusicException(Exception):
     def __str__(self):
         return repr(self.message)
 
-def same(xs):
-    y = xs[0]
-    return all(y==x for x in xs)
-
+def save_wav(audio, name, sr=SAMPLE_RATE):
+    wavfile.write(name, sr, audio.astype('uint16'))
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Basis
@@ -79,58 +83,51 @@ print 'dtype of basis is %s' % dtypes[0]
 # "Y[n,t]" means how loud note "notes[n]" is at time "t"
 basis.sort(key=fst)
 
+# unique note per freq
+if not unique(basis, key=lambda x: music.note(fst(x))):
+    raise MusicException('notes not unique')
+
+if not same(basis, key=lambda x: len(snd(x))):
+    raise MusicException('audio basis not same size')
+SIZE_AUDIO = snd(basis[0]).size
+
 notes    = [music.note(freq) for freq,_ in basis]
 notes_ii = ii(notes) # inverted index for notes
+NUM_NOTES = len(notes)
 
-piano =       { music.note(freq) : audio for freq,audio in basis }
-piano.update( { notes_ii[freq]   : audio for freq,audio in basis } )
-# piano can be keyed by either String (eg 'C1') or Number (eg 3)
+piano = { music.note(freq) : audio for freq,audio in basis }
+piano.update( 
+    { notes_ii[key] : audio for key, audio in piano.items() } )
+# piano can be keyed by either String or Number
+# eg all(piano['C1']==piano[3])
 
-#wavfile.write('tritone.wav', 44100, piano['C3']+piano['F#3'])
+#wavfile.write('tritone.wav', SAMPLE_RATE, piano['C3']+piano['F#3'])
 # sounds like tritone! i know the math, but i had to hear it.
 #TODO check to see if record-then-add-notes sounds different than record-interval
-
-
-
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Training Data
 
 #:: type
-nNotes = len(notes)
-nFreqs = 1024
+NUM_NOTES = len(notes)
+NUM_FREQS = 1024
 
 seconds = 2
 
 #:: |time| x |freqs|
-X = zeros((sample_rate * seconds, nFreqs))
+#X = zeros((SAMPLE_RATE * seconds, NUM_FREQS))
 
 #:: |time| x |notes|
-Y = zeros((sample_rate * seconds, nNotes))
+#Y = zeros((SAMPLE_RATE * seconds, NUM_NOTES))
 
 #:: |time| x 1
-A = zeros(sample_rate * seconds, dtype=dtypes[0])
-
-def play(n,t,x):
-    """ 
-    play note n:str (eg 'C3')
-    at time t:int (in seconds)
-    with loudness x:float (in [0,1], later normalized)
-    """
-    t = int( t * sample_rate )
-    if t < 0 or t > len(A)-1 : raise ValueError('t<0 or t>|A|')
-    
-    Y[t , notes_ii[n]] = x
-
-    audio = piano[n]
-    A[ t:t+len(audio) ] += audio[:len(A)-t]
+#A = zeros(SAMPLE_RATE * seconds, dtype=dtypes[0])
 
 #TEST
-play('F#3', 1, 1.0)
-play('C3',  1, 1.0)
-
+#play(1, 1.0, 'F#3')
+#play(1, 1.0, 'C3')
 #wavfile.write('ifft.wav',
-#              sample_rate,
+#              SAMPLE_RATE,
 #              ifft(fft(A)).astype('uint16'))
 #print 'made tritone'
 # $ play tritone.wav
@@ -142,24 +139,44 @@ play('C3',  1, 1.0)
 # X = win_fft(A)
 
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# Generative Music Model
-"""
-WHAT
-melody
-harmony
-accelerando
-crescendo
-
-HOW
-sparsity
-ngrams
-
-"""
-
-def make_notes(model, k=SAMPLE_RATE * 10):
-    """ generate notes (k samples) from a generative music model
+def play(X,Y, t,x,n):
+    """ note at some time => audio from some time => add by loudness
     
+    play note n:str|int (eg 'C3' or 5)
+    at time t:int (in seconds)
+    with loudness x:float (in [0,1], later normalized)
+
+    assumes the time-length of X and Y are equal
+    """
+    if type(n)==str: n = notes_ii[n]
+    T = X.size
+    t = int(t)
+    if t < 0 or t > T-1 : raise ValueError('t<0 or t>|X|')
+    
+    Y[t , n] = x 
+    
+    audio = piano[n]
+    X[ t:t+SIZE_AUDIO ] += audio[:T-t] * x
+
+def tritone(n):
+    if type(n)==str:
+        return notes[notes_ii[n]+6]
+    else:
+        return n+6
+
+def play_tritone(X,Y, t=0, n='C3', x=1):
+    if type(n)==str: n = notes_ii[n]
+    play(X,Y, t,x,n)
+    play(X,Y, t,x,tritone(n))
+
+
+     
+# # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Generate Infinite Training Data
+
+def make_notes_and_sounds(model, T=SAMPLE_RATE * 2):
+    """ generate notes (t samples) from a generative music model
+
     notes : T x N : |samples| x |notes|
     default |samples| is 10sec
 
@@ -174,27 +191,18 @@ def make_notes(model, k=SAMPLE_RATE * 10):
     note := attack
     note : real
     """
+    print 'making notes and sounds...'
 
-    
-# # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# Generate Infinite Training Data
-
-def sound_from_notes(notes, piano=piano):
-    """ note at time T => audio from time T => add by loudness
-    """
-    T,N = notes.shape
-    
-    for t in range(T):
-        for n in range(N):
-            loud = notes[t,n]
-            audio = piano[n]
-            if loud > 0:
-                sound[t:t+len(audio)] += audio[:len(sound)-t] * loud
+    X = zeros(T)
+    Y = zeros((T, NUM_NOTES))
+    play_tritone(X,Y, t=SAMPLE_RATE)
+    return X,Y
 
 
 def inputs_from_sound(sound, window_size = 2**12):
     """ sound => split into overlapping samples => window => fft
     """
+    print 'making inputs...'
 
     hanning_window = hanning(window_size)
 
@@ -212,7 +220,24 @@ def inputs_from_sound(sound, window_size = 2**12):
     return spectrum
 
 
-def gen_notes(model):    
+# # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Generative Music Model
+"""
+WHAT
+melody
+harmony
+accelerando
+crescendo
+
+HOW
+sparsity
+ngrams
+
+"""
+
+model = None
+
+def gen(model):    
     """
     model : { params }
     model : call by ref
@@ -220,16 +245,14 @@ def gen_notes(model):
     """
 
     while True:
-        Y = make_notes(model)
-        X = inputs_from_sound( sound_from_notes( Y, piano ))
+        X,Y = make_notes_and_sounds(model)
         yield X,Y
-        
-        
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Run Function Approximator 
 
-model = todo
+for i,(X,Y) in enumerate(gen(model)):
+    print i
+    save_wav(X, '3tone.wav')
+    break
 
-for X,Y in gen_notes(model):
-    pass
