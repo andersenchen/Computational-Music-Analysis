@@ -140,3 +140,96 @@ play('C3',  1, 1.0)
 
 # after you make some music
 # X = win_fft(A)
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Generative Music Model
+"""
+WHAT
+melody
+harmony
+accelerando
+crescendo
+
+HOW
+sparsity
+ngrams
+
+"""
+
+def make_notes(model, k=SAMPLE_RATE * 10):
+    """ generate notes (k samples) from a generative music model
+    
+    notes : T x N : |samples| x |notes|
+    default |samples| is 10sec
+
+    prototype models
+    which notes "n"
+    how loud "x"
+    what time "t"
+    
+    doesn't need to sound like music
+    but should locally look like music
+    
+    note := attack
+    note : real
+    """
+
+    
+# # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Generate Infinite Training Data
+
+def sound_from_notes(notes, piano=piano):
+    """ note at time T => audio from time T => add by loudness
+    """
+    T,N = notes.shape
+    
+    for t in range(T):
+        for n in range(N):
+            loud = notes[t,n]
+            audio = piano[n]
+            if loud > 0:
+                sound[t:t+len(audio)] += audio[:len(sound)-t] * loud
+
+
+def inputs_from_sound(sound, window_size = 2**12):
+    """ sound => split into overlapping samples => window => fft
+    """
+
+    hanning_window = hanning(window_size)
+
+    # double <- overlap windows
+    nWindows = int32(sound.size/window_size *2)
+
+    spectrum = zeros((nWindows,window_size))
+
+    for i in xrange(0,nWindows-1):
+        t = int32(i* window_size/2)
+        # elemwise mult
+        window = sound[t : t+window_size] * hanning_window
+        spectrum[i,:] = fft(window)
+
+    return spectrum
+
+
+def gen_notes(model):    
+    """
+    model : { params }
+    model : call by ref
+    whoever uses gen_notes can update the model
+    """
+
+    while True:
+        Y = make_notes(model)
+        X = inputs_from_sound( sound_from_notes( Y, piano ))
+        yield X,Y
+        
+        
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Run Function Approximator 
+
+model = todo
+
+for X,Y in gen_notes(model):
+    pass
