@@ -93,7 +93,7 @@ SIZE_AUDIO = snd(basis[0]).size
 
 notes    = [music.note(freq) for freq,_ in basis]
 notes_ii = ii(notes) # inverted index for notes
-NUM_NOTES = len(notes)
+nNOTES = len(notes)
 
 piano = { music.note(freq) : audio for freq,audio in basis }
 piano.update( 
@@ -109,16 +109,16 @@ piano.update(
 # Training Data
 
 #:: type
-NUM_NOTES = len(notes)
-NUM_FREQS = 1024
+nNOTES = len(notes)
+nFREQS = 1024
 
 seconds = 2
 
 #:: |time| x |freqs|
-#X = zeros((SAMPLE_RATE * seconds, NUM_FREQS))
+#X = zeros((SAMPLE_RATE * seconds, nFREQS))
 
 #:: |time| x |notes|
-#Y = zeros((SAMPLE_RATE * seconds, NUM_NOTES))
+#Y = zeros((SAMPLE_RATE * seconds, nNOTES))
 
 #:: |time| x 1
 #A = zeros(SAMPLE_RATE * seconds, dtype=dtypes[0])
@@ -170,9 +170,23 @@ def play_tritone(X,Y, t=0, n='C3', x=1):
     play(X,Y, t,x,tritone(n))
 
 
-     
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# Generate Infinite Training Data
+# Generative Music Model
+"""
+WHAT
+melody
+harmony
+accelerando
+crescendo
+
+HOW
+sparsity
+ngrams
+
+"""
+
+model = None
+
 
 def make_notes_and_sounds(model, T=SAMPLE_RATE * 2):
     """ generate notes (t samples) from a generative music model
@@ -187,16 +201,26 @@ def make_notes_and_sounds(model, T=SAMPLE_RATE * 2):
     
     doesn't need to sound like music
     but should locally look like music
+
+    note
+    note := periodic modes + aperiodic attack
+    note : R | {0 1}
+    periodic note := sum-of-sines + phase|amplitude noise + decay
+    aperiodic note := correlated gaussian noise process
     
-    note := attack
-    note : real
+    
     """
     print 'making notes and sounds...'
-
+    
     X = zeros(T)
-    Y = zeros((T, NUM_NOTES))
+    Y = zeros((T, nNOTES))
     play_tritone(X,Y, t=SAMPLE_RATE)
     return X,Y
+
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Generate Infinite Training Data
 
 
 def inputs_from_sound(sound, window_size = 2**12):
@@ -220,27 +244,10 @@ def inputs_from_sound(sound, window_size = 2**12):
     return spectrum
 
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# Generative Music Model
-"""
-WHAT
-melody
-harmony
-accelerando
-crescendo
-
-HOW
-sparsity
-ngrams
-
-"""
-
-model = None
-
 def gen(model):    
     """
     model : { params }
-    model : call by ref
+    model is dict ~ call model by ref
     whoever uses gen_notes can update the model
     """
 
@@ -251,8 +258,26 @@ def gen(model):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Run Function Approximator 
 
+def run(X):
+    """ neural network
+    X goes in => hidden layer => Y comes out
+
+    
+    """
+    
+
+def eval(model, Y, fX):
+    """ cmp the true "Y" to the guess "fX" => udpate model given err
+
+    model is dict ~ call model by ref
+    """
+    
+    
+
 for i,(X,Y) in enumerate(gen(model)):
     print i
-    save_wav(X, '3tone.wav')
+    X_ = inputs_from_sound(X)
+    Y_ = run(X_)
+    eval(model, Y, Y_)
     break
 
