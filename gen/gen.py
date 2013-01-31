@@ -1,19 +1,21 @@
 #!/usr/bin/python
 from __future__ import division
 
-from numpy import *
-from matplotlib.pyplot import *
-from scipy.stats import *
-from numpy.fft import fft,ifft
-
 import nltk, re, pprint
 from scipy.io import wavfile
 from glob import *
+
+from numpy import *
+from matplotlib.pyplot import *
+import numpy.random as sample
+import scipy.stats as pdf
+from numpy.fft import fft,ifft
 
 from sam.sam import *
 import sam.music as music
 from music.pitch import pitch
 
+from numpy.fft import fft,ifft
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 #
 
@@ -89,7 +91,7 @@ if not unique(basis, key=lambda x: music.note(fst(x))):
 
 if not same(basis, key=lambda x: len(snd(x))):
     raise MusicException('audio basis not same size')
-SIZE_AUDIO = snd(basis[0]).size
+AUDIO_SIZE = snd(basis[0]).size
 
 notes    = [music.note(freq) for freq,_ in basis]
 notes_ii = ii(notes) # inverted index for notes
@@ -100,6 +102,11 @@ piano.update(
     { notes_ii[key] : audio for key, audio in piano.items() } )
 # piano can be keyed by either String or Number
 # eg all(piano['C1']==piano[3])
+
+A = zeros((AUDIO_SIZE, nNOTES))
+for n in range(nNOTES):
+    A[:,n] = piano[n]
+
 
 #wavfile.write('tritone.wav', SAMPLE_RATE, piano['C3']+piano['F#3'])
 # sounds like tritone! i know the math, but i had to hear it.
@@ -120,8 +127,6 @@ seconds = 2
 #:: |time| x |notes|
 #Y = zeros((SAMPLE_RATE * seconds, nNOTES))
 
-#:: |time| x 1
-#A = zeros(SAMPLE_RATE * seconds, dtype=dtypes[0])
 
 #TEST
 #play(1, 1.0, 'F#3')
@@ -156,7 +161,7 @@ def play(X,Y, t,x,n):
     Y[t , n] = x 
     
     audio = piano[n]
-    X[ t:t+SIZE_AUDIO ] += audio[:T-t] * x
+    X[ t:t+AUDIO_SIZE ] += audio[:T-t] * x
 
 def tritone(n):
     if type(n)==str:
@@ -188,7 +193,7 @@ ngrams
 model = None
 
 
-def make_notes_and_sounds(model, T=SAMPLE_RATE * 2):
+def make_notes_and_sounds(model, T=SAMPLE_RATE * 1):
     """ generate notes (t samples) from a generative music model
 
     notes : T x N : |samples| x |notes|
@@ -208,13 +213,32 @@ def make_notes_and_sounds(model, T=SAMPLE_RATE * 2):
     periodic note := sum-of-sines + phase|amplitude noise + decay
     aperiodic note := correlated gaussian noise process
     
+    Genarative Model #1
+    each time, random chord
+    sample next time from gaussian
+    sample |notes| from exponential
     
     """
     print 'making notes and sounds...'
-    
     X = zeros(T)
     Y = zeros((T, nNOTES))
-    play_tritone(X,Y, t=SAMPLE_RATE)
+    T = X.size - AUDIO_SIZE - 1
+    over_notes = 0 if A.shape[0]==nNOTES else 1
+
+    t = 0
+    while t<T:
+        Y[t,:] = sample.exponential(0.2, nNOTES)
+        Y[t,:][Y[t,:] < 0.5] = 0
+        #  randomly zero or real
+
+        print( t,T,X.size)
+        X[t:t+AUDIO_SIZE] = sum( Y[t,:] * A , axis=over_notes )
+        #  Y weights A along Time
+        #  broadcast (1,N) to (AUDIO_SIZE, N)
+        #  sum over Notes
+        
+        t += max(1, int(sample.normal(1, 1)*SAMPLE_RATE))
+
     return X,Y
 
 
@@ -252,7 +276,7 @@ def gen(model):
     """
 
     while True:
-        X,Y = make_notes_and_sounds(model)
+        X,Y = make_notes_and_sounds(model, T = SAMPLE_RATE*10)
         yield X,Y
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -275,9 +299,10 @@ def eval(model, Y, fX):
     
 
 for i,(X,Y) in enumerate(gen(model)):
-    print i
+    print( 'gen #%d' % i )
     X_ = inputs_from_sound(X)
     Y_ = run(X_)
     eval(model, Y, Y_)
+    save_wav(X, 'chaos.wav', sr=SAMPLE_RATE)
     break
 
