@@ -10,6 +10,7 @@ from matplotlib.pyplot import *
 import numpy.random as sample
 import scipy.stats as pdf
 from numpy.fft import fft,ifft
+from scipy.ndimage import gaussian_filter
 
 from sam.sam import *
 import sam.music as music
@@ -217,6 +218,14 @@ def make_notes_and_sounds(model, T=SAMPLE_RATE * 1):
     each time, random chord
     sample next time from gaussian
     sample |notes| from exponential
+    TODO sample note duration
+
+    Genarative Model #2
+    noise
+     add gaussian noise = blur
+     swap samples
+     if hmm, then observation noise + transition noise variance
+    distort pitch
     
     """
     print 'making notes and sounds...'
@@ -224,21 +233,25 @@ def make_notes_and_sounds(model, T=SAMPLE_RATE * 1):
     Y = zeros((T, nNOTES))
     T = X.size - AUDIO_SIZE - 1
     over_notes = 0 if A.shape[0]==nNOTES else 1
-
-    t = 0
+        
+    t = max(0, int(sample.normal(1, 1)*SAMPLE_RATE))
     while t<T:
         Y[t,:] = sample.exponential(0.2, nNOTES)
         Y[t,:][Y[t,:] < 0.5] = 0
         #  randomly zero or real
 
-        print( t,T,X.size)
         X[t:t+AUDIO_SIZE] = sum( Y[t,:] * A , axis=over_notes )
         #  Y weights A along Time
         #  broadcast (1,N) to (AUDIO_SIZE, N)
         #  sum over Notes
+
+        sigma = sample.randint(1,20)
+        #  1 sounds the same
+        #  100 sounds like nothing
+        X[t:t+AUDIO_SIZE] = gaussian_filter(X[t:t+AUDIO_SIZE], sigma)
         
         t += max(1, int(sample.normal(1, 1)*SAMPLE_RATE))
-
+            
     return X,Y
 
 
@@ -281,11 +294,30 @@ def gen(model):
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Run Function Approximator 
+"""
+    neural-network has ...
+    combo : R^n => R = combination function
+    activ : R => R = activation function
+    err = error function
+    reg = regularization
+    obj = objective function
+    y = wanted output
+    x = input
+    w = weights
+"""
 
 def run(X):
     """ neural network
     X goes in => hidden layer => Y comes out
 
+    prev ... => combo => activ => next ...
+
+    run ~>
+    combo
+    activ
+
+    combo  :   = 
+    activ  :   =
     
     """
     
@@ -294,15 +326,23 @@ def eval(model, Y, fX):
     """ cmp the true "Y" to the guess "fX" => udpate model given err
 
     model is dict ~ call model by ref
+
+    eval ~>
+    err
+    reg
+    obj
     """
     
     
 
 for i,(X,Y) in enumerate(gen(model)):
     print( 'gen #%d' % i )
+
     X_ = inputs_from_sound(X)
     Y_ = run(X_)
+
     eval(model, Y, Y_)
+    
     save_wav(X, 'chaos.wav', sr=SAMPLE_RATE)
     break
 
