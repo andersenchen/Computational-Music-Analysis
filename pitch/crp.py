@@ -3,15 +3,14 @@ from __future__ import division
 
 from numpy import *
 from matplotlib.pyplot import *
+import matplotlib.pyplot as plt
 import numpy.random as samples
 import scipy.stats as pdfs
 import random
 import __builtin__
 import itertools
 import time
-
-from sam.sam import *
-
+import argparse
 
 def unzip(xys):
     xs = [x for x,y in xys]
@@ -79,7 +78,13 @@ def crp(data):
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
-ion()
+parser = argparse.ArgumentParser()
+parser.add_argument('-ioff', action='store_true', dest='ioff')
+args = parser.parse_args()
+
+save = not args.ioff
+if save: ioff()
+if not save: ion()
 
 # make data from few gaussians
 mx,my = 5,10
@@ -96,7 +101,7 @@ cy = [samples.normal(loc=my,scale=2.0) for _ in range(5)]
 
 figure(); axis((0,20,0,20))
 scatter(ax,ay,c='r'); scatter(bx,by,c='b'); scatter(cx,cy,c='y')
-draw()
+if not save: draw() 
 
 # for crp
 data = [array([x,y]) for x,y in zip(ax,ay)+zip(bx,by)+zip(cx,cy)]
@@ -111,6 +116,8 @@ for cluster in clusters:
     if len(cluster)>1: # only show non-singleton clusters
         xs,ys = unzip(cluster)
         scatter(xs,ys, c=colors.next())
-draw()
+if not save: draw()
 
-time.sleep(60)
+if not save: time.sleep(60)
+
+if save: show()
