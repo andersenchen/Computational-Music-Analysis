@@ -12,9 +12,6 @@ from scipy.io import wavfile
 from glob import *
 import re
 
-window_size = 2**12
-hanning_window = hanning(window_size)
-
 
 def audio_wav(file, truncate=None):
     #  audio :: |samples| by |channels|
@@ -37,14 +34,16 @@ def audio_wav(file, truncate=None):
 
     return audio, sample_rate
 
-def process_wav(file, truncate=None):
-    """ 
-    spectrum :: num_windows by window_size
+def process_wav(file, truncate=None, window_size = 2**12):
+    """
+    spectrum : |windows| by window_size
     |frequencies| = window_size
-    num_windows / 2 * |frequencies| ~ |seconds| * sample_rate
+    |windows| / 2 * |frequencies| ~ |seconds| * sample_rate
     """ 
     print 'processing %s...' % file
     audio, sample_rate = audio_wav(file, truncate=truncate)
+
+    hanning_window = hanning(window_size)
 
     nWindows = int32(audio.size/window_size *2) # double <- overlap windows
     
@@ -78,7 +77,7 @@ def to_freq(file):
     raise Exception('bad audio filename "%s"' % file)
 
 
-def train_joint(dataset):
+def train_joint(dataset, window_size = 2**12):
     print
     print 'TRAINING...'
     
@@ -105,7 +104,7 @@ def train_joint(dataset):
     print 'truncating at %s samples' % (truncate)
 
     for i,file in enumerate(flatten(dataset)):
-        spec, _ = process_wav(file,truncate=truncate)
+        spec, _ = process_wav(file, truncate=truncate, window_size=window_size)
         
         # normalize to unit vector
         classifier[i,:] = sum(spec,0) / sum(spec)
